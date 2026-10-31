@@ -125,11 +125,21 @@ async function applyExits(L, cfg, getKlines, now) {
     if (!done) { still.push(p); continue; }
     const gross = p.qty * (done.px - p.entry), exitFee = p.qty * done.px * cfg.feePct, pnl = gross - p.entryFee - exitFee;
     L.cash += p.qty * done.px - exitFee;
-    const row = { t: done.t, coin: p.sym, tf: p.tf, rule: p.rule, r: pnl / p.riskAmt, pnl, why: done.why, entry: p.entry, exit: done.px };
+    const row = { t: done.t, coin: p.sym, tf: p.tf, rule: p.rule, r: pnl / p.riskAmt, pnl, why: done.why, entry: p.entry, exit: done.px, qty: p.qty, entryTime: p.entryTime, sl: p.sl, tp: p.tp, riskAmt: p.riskAmt, ai: p.ai || null };
     L.closed.push(row); L.day.realized += pnl; L.cooldown[p.sym] = done.t + cfg.cooldownCandles * TFMS[p.tf];
     logAdd(L, cfg, done.t, "close", { coin: p.sym, tf: p.tf, r: fmtR(row.r), why: done.why });
   }
   L.open = still;
+}
+
+/* ---- 5a. close one open position now at `bid` (the AI asked to cut it early). Only REDUCES risk; same fee/slip model as a stop. */
+function closeEarly(L, cfg, sym, bid, now, why = "ai") {
+  const p = L.open.find((x) => x.sym === sym); if (!p || !(bid > 0)) return null;
+  const px = bid * (1 - cfg.timeoutSlipPct), gross = p.qty * (px - p.entry), exitFee = p.qty * px * cfg.feePct, pnl = gross - p.entryFee - exitFee;
+  L.cash += p.qty * px - exitFee; L.open = L.open.filter((x) => x !== p);
+  const row = { t: now, coin: p.sym, tf: p.tf, rule: p.rule, r: pnl / p.riskAmt, pnl, why, entry: p.entry, exit: px, qty: p.qty, entryTime: p.entryTime, sl: p.sl, tp: p.tp, riskAmt: p.riskAmt, ai: p.ai || null };
+  L.closed.push(row); L.day.realized += pnl; L.cooldown[p.sym] = now + cfg.cooldownCandles * TFMS[p.tf];
+  logAdd(L, cfg, now, "close", { coin: p.sym, tf: p.tf, r: fmtR(row.r), why }); return row;
 }
 
 /* ---- 5b. per-rule health: a V8 code whose LIVE paper results are poor is paused (the app's Validation is the past; this is the future).
@@ -163,4 +173,4 @@ function finishRound(L, cfg, now) {
   L.lastRun = now; return eq;
 }
 
-module.exports = { rollDay, updateCodeGuard, entryCandle, explainCode, newLedger, equityOf, greenEdge, findCandidates, gate, tryEnter, commitEntry, applyExits, finishRound, logAdd, openRisk, dayKey, fmtP };
+module.exports = { rollDay, updateCodeGuard, entryCandle, explainCode, newLedger, equityOf, greenEdge, findCandidates, gate, tryEnter, commitEntry, applyExits, closeEarly, finishRound, logAdd, openRisk, dayKey, fmtP };

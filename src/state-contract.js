@@ -30,6 +30,11 @@ function validate(s) {
   list("closed", (x, p, n) => { n(num(x.t), p + "t"); n(str(x.coin), p + "coin"); n(str(x.tf), p + "tf"); n(num(x.r), p + "r"); n(num(x.pnl), p + "pnl"); });
   list("signals", (x, p, n) => { n(str(x.coin), p + "coin"); n(str(x.tf), p + "tf"); n(str(x.rule), p + "rule"); n(x.val === "both" || x.val === "spread", p + 'val must be "both"|"spread"'); n(["wait", "watch", "skip"].includes(x.st), p + "st"); });
   list("log", (x, p, n) => { n(num(x.t), p + "t"); n(LOG_KEYS.includes(x.k), p + "k must be one of " + LOG_KEYS.join("/")); n(x.v && typeof x.v === "object", p + "v must be an object"); });
+  /* optional V6 fields: if present they must have the right shape (the page ignores any it does not know) */
+  if (s.decisions !== undefined) list("decisions", (x, p, n) => { n(num(x.t), p + "t"); n(str(x.action), p + "action"); });
+  if (s.rules !== undefined) need(s.rules && typeof s.rules === "object" && s.rules.leverage === 1 && s.rules.side === "long", "rules must say long / leverage 1 (this bot has no leverage and no shorts)");
+  if (s.ai !== undefined) need(s.ai && typeof s.ai === "object" && typeof s.ai.mode === "string", "ai.mode must be a string");
+  if (Array.isArray(s.open)) s.open.forEach((x, i) => { if (x.leverage !== undefined) need(x.leverage === 1, "open[" + i + "].leverage must be 1"); if (x.side !== undefined) need(x.side === "BUY", "open[" + i + "].side must be BUY"); });
   if (r && num(r.positions) && Array.isArray(s.open)) need(r.positions === s.open.length, "risk.positions (" + r.positions + ") must equal open.length (" + s.open.length + ")");
   return { ok: !e.length, errors: e.slice(0, 20) };
 }

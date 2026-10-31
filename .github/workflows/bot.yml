@@ -1,7 +1,7 @@
 # Copy to the BOT repo as .github/workflows/bot.yml  (a separate repo from the app and the scanner).
 # Ledger + state live on a separate branch "bot-data" so code commits and data commits never mix.
 # One-time: create the branch  (git checkout --orphan bot-data && git rm -rf . && git commit --allow-empty -m init && git push origin bot-data)
-# Secrets: BOT_STATE_URL (the state Worker URL), BOT_STATE_TOKEN (the Worker's WRITE_TOKEN).
+# Secrets: GEMINI_API_KEY, CF_ACCOUNT_ID + CF_API_TOKEN (AI providers, either or both), BOT_STATE_URL (the state Worker URL), BOT_STATE_TOKEN (the Worker's WRITE_TOKEN).
 name: bot-ai
 on:
   schedule: [{ cron: "8,23,38,53 * * * *" }]   # after the scanner's 01/16/31/46 runs; GitHub may delay a few minutes (entry window: 30 min)
@@ -18,8 +18,15 @@ jobs:
         with: { ref: bot-data, path: data }
       - uses: actions/setup-node@v4
         with: { node-version: 20 }
-      - run: node test/app-reader.test.js && node test/state.test.js && node test/bot.test.js && node test/improve.test.js
-      - run: node src/run.js --ledger data/ledger.json --state data/bot-state.json
+      - run: node test/app-reader.test.js && node test/state.test.js && node test/bot.test.js && node test/improve.test.js && node test/ai-decide.test.js
+      - name: Run one round (AI decides)
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
+          CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+          AI_PROXY_URL: ${{ secrets.AI_PROXY_URL }}
+          AI_PROXY_TOKEN: ${{ secrets.AI_PROXY_TOKEN }}
+        run: node src/run.js --ledger data/ledger.json --state data/bot-state.json
       - name: Publish state (a failure here must not lose the ledger)
         continue-on-error: true
         env: { BOT_STATE_URL: "${{ secrets.BOT_STATE_URL }}", BOT_STATE_TOKEN: "${{ secrets.BOT_STATE_TOKEN }}" }

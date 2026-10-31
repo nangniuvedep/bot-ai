@@ -16,3 +16,10 @@ Written only by the bot, read-only for the page. Change the shape = bump `v`; th
 Rules: times are UTC epoch ms (the page shows them in the reader's time zone); no sentences, no HTML — only keys and values;
 every value is escaped by the page; win rate, expectancy and profit factor are computed by the page from `closed`.
 Fresh: the page shows STALE DATA when `updatedAt` is older than `config.staleAfterMin`.
+
+## Optional fields added in V6 (still `v: 1`; a page that does not know them ignores them)
+- `open[]`: `side` ("BUY" only), `market` ("spot"), `leverage` (always 1), `status` ("open"), `entryTime`, `expiry`, `notional`, `riskAmt`, `slPct`, `tpPct`, `pnlR`, `rule`, `by` ("ai"|"rules"), `aiWhy`, `aiConf`, `aiConv`, `aiModel`.
+- `closed[]`: `side`, `leverage`, `entry`, `exit`, `qty`, `entryTime`, `why` ("target"|"stop"|"time"|"ai"), `rule`, `sl`, `tp`, `riskAmt`, `by`, `aiWhy`.
+- `rules`: the real limits from config (market, side, leverage, stopAtr, targetAtr, maxHoldCandles, riskPct, ...). The validator rejects `leverage != 1` or `side != "long"`.
+- `ai`: `{mode, providers[], last:{t, ok, provider, model, ms, view, noTrade, why, candidates, picked, calls}}`.
+- `decisions[]`: last 40 `{t, coin?, tf?, rule?, action: open|skip|wait|close|ai-view, reason, why?, conf?, conv?, provider?, model?}`. `why` is a short AI sentence (<=200 chars); the page escapes it.

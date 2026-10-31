@@ -5,7 +5,7 @@
 const { chromium } = require("playwright"), fs = require("fs"), path = require("path");
 const ui = path.join(__dirname, "..", "ui"), url = "file://" + path.join(ui, "index.html"), argv = process.argv;
 const shots = argv.includes("--shots") ? argv[argv.indexOf("--shots") + 1] : null;
-const PAGES = ["overview", "positions", "history", "signals", "risk", "log", "settings"], STATE = "https://state.example.workers.dev/state.json", PRICE = "https://data.example.test/universe-slim-top.json";
+const PAGES = ["overview", "positions", "history", "decisions", "signals", "risk", "log", "settings"], STATE = "https://state.example.workers.dev/state.json", PRICE = "https://data.example.test/universe-slim-top.json";
 (async () => {
   const b = await chromium.launch(), errs = [], T = new Set(), S = new Set(); let n = 0;
   async function run(label, w, h, page, tweak, expect) {

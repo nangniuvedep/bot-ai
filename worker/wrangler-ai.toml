@@ -1,0 +1,7 @@
+# Deploy (account PHU nangniuvedep): npx wrangler deploy -c wrangler-ai.toml   then   npx wrangler secret put AI_TOKEN -c wrangler-ai.toml
+name = "bot-ai-llm"
+main = "ai-worker.mjs"
+compatibility_date = "2025-01-01"
+
+[ai]
+binding = "AI"

@@ -40,9 +40,33 @@
     "pauseHours": 72
   },
   "ai": {
-    "mode": "off",
-    "maxCallsPerDay": 60,
+    "mode": "decide",
+    "maxCallsPerDay": 96,
+    "maxCandidates": 12,
+    "timeoutMs": 60000,
+    "maxOutputTokens": 1500,
+    "pauseMin": 30,
     "minShrink": 0.25,
-    "timeoutMs": 20000
+    "providers": [
+      {
+        "type": "gemini",
+        "model": "gemini-2.5-flash",
+        "keyEnv": "GEMINI_API_KEY"
+      },
+      {
+        "type": "worker-ai",
+        "model": "@cf/openai/gpt-oss-120b"
+      },
+      {
+        "type": "worker-ai",
+        "model": "@cf/google/gemma-4-26b-a4b-it"
+      },
+      {
+        "type": "workers-ai",
+        "model": "@cf/openai/gpt-oss-120b",
+        "accountEnv": "CF_ACCOUNT_ID",
+        "keyEnv": "CF_API_TOKEN"
+      }
+    ]
   }
 }

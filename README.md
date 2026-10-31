@@ -35,6 +35,8 @@ Bot-AI/
 ```
 Mọi bước sau (B2 sổ lệnh, B3 dữ liệu bổ sung, B4 AI) thêm file mới trong `src/`, không sửa ngoài thư mục này.
 
+**V4 (2026-10-31):** đường ống chạy thật và đã chuyển sang tài khoản Cloudflare PHỤ — **đọc `docs/DEPLOYED.md` TRƯỚC khi deploy** (2 tài khoản, luật cấm deploy vào tài khoản chính, địa chỉ, secret ở đâu, billing, việc còn mở). Script triển khai: `scripts/` (`chuyen-sang-tai-khoan-phu.sh` đã chạy xong, đừng chạy lại).
+
 ## Lập trình riêng (tiết kiệm token)
 Người viết bot chỉ cần đọc: `README.md`, `docs/ARCHITECTURE.md` (kiến trúc v2), `docs/PLAN.md` (việc cần làm), `docs/DATA-CONTRACT.md`. Không cần mở app.
 `docs/BOT-AI-DESIGN.md` là thiết kế cũ B0 (đã được thay thế).

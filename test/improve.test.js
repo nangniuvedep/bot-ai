@@ -2,7 +2,7 @@
 "use strict";
 const assert = require("assert"), B = require("../src/bot.js"), AI = require("../src/ai-gate.js"), { validate } = require("../src/state-contract.js"), { round, CFG } = require("../src/run.js");
 const H = 36e5, M = 6e4, S = Date.UTC(2026, 9, 29, 13, 0), NOW = S + 8 * M, E = B.entryCandle(S, "1H");
-const mk = () => JSON.parse(JSON.stringify(CFG));
+const mk = () => { const c = JSON.parse(JSON.stringify(CFG)); c.ai.mode = "off"; return c; };
 const row = (code, a, b) => ({ code, a: { n: 200, cfg: { "1-2": [a, 200 - a, 0] } }, b: { n: 200, cfg: { "1-2": [b, 200 - b, 0] } } });
 const val = { v: 2, at: S, tf: { "1H": { base: { a: { "1-2": { up: [60, 140, 0], dn: [0, 0, 0] } }, b: { "1-2": { up: [60, 140, 0], dn: [0, 0, 0] } } },   // base 30 %
   rows: [row("V8-01", 90, 80), row("V8-02", 80, 70), row("V8-03", 70, 66), row("V8-04", 66, 65)] } } };                                              // edges .10 .05 .03 .025

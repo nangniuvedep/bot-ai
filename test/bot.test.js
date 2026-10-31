@@ -2,7 +2,7 @@
 "use strict";
 const assert = require("assert"), B = require("../src/bot.js"), BN = require("../src/binance.js"), SB = require("../src/state-builder.js"), { validate } = require("../src/state-contract.js"), { round, CFG } = require("../src/run.js");
 const H = 36e5, M = 6e4, NOW0 = Date.UTC(2026, 9, 29, 13, 8);               // 13:08 UTC; the app's `at` = 13:00 = when the signal candle closed = entry candle open
-const S = Date.UTC(2026, 9, 29, 13, 0), E = B.entryCandle(S, "1H"), cfg = JSON.parse(JSON.stringify(CFG));
+const S = Date.UTC(2026, 9, 29, 13, 0), E = B.entryCandle(S, "1H"), cfg = JSON.parse(JSON.stringify(CFG)); cfg.ai.mode = "off";
 
 /* app files: SOL has green V8-01; DOGE has a hit but its validation is not green; ETH green but spread is wide */
 const sig = (coins) => ({ "1H": { at: S, scanned: 3, coins } });

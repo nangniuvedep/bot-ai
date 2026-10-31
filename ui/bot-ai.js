@@ -72,12 +72,12 @@
   var LOGT = { /* English templates; the bot sends only a key + values (never sentences) */
     run: ["check", "Run complete · candidates {a} · waiting {b} · watching {c}"],
     cand: ["signal", "Candidate <b>{coin}</b> {tf} · {rule} passed both stages"],
-    open: ["portfolio", "Opened <b>{coin}</b> {tf} at {price} · risk {risk} equity"],
+    open: ["portfolio", "Opened BUY <b>{coin}</b> {tf} at {price} · spot, no leverage · risk {risk} equity"],
     skip: ["warning", "Skipped <b>{coin}</b>: spread above configured limit"],
     close: ["check", "Closed <b>{coin}</b> {tf} at target · {r}"]
   };
-  var CLOSET = { stop: "Closed <b>{coin}</b> {tf} at stop · {r}", time: "Closed <b>{coin}</b> {tf} after max hold time · {r}" };
-  var VAL = { both: "Both stages green", spread: "Spread too wide" }, ST = { wait: "Waiting for candle", watch: "Watching", skip: "Skipped" };
+  var CLOSET = { stop: "Closed <b>{coin}</b> {tf} at stop · {r}", time: "Closed <b>{coin}</b> {tf} after max hold time · {r}", ai: "Closed <b>{coin}</b> {tf} early by AI · {r}" };
+  var VAL = { both: "Both stages green", spread: "Spread too wide" }, ST = { wait: "Waiting", watch: "Order open", skip: "Not entered" };
   function hue(s) { var h = 0, i; for (i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) % 360; return h; }
   function coin(c) { return '<span class="co"><i class="cc" style="background:hsl(' + hue(c) + ',55%,48%)">' + esc(c.slice(0, 3)) + "</i>" + esc(c) + "</span>"; }
   function kpi(l, i, v, s, c) { return '<div class="card kp"><div class="kl">' + ic(i, "b14") + __t(l) + '</div><div class="kv ' + (c || "") + '">' + v + '</div><div class="ks">' + s + "</div></div>"; }
@@ -103,17 +103,69 @@
       row("chart-area", "Drawdown from peak", pc(R.drawdown), R.drawdown / R.drawdownLimit) +
       '<div class="rk"><div class="rr"><span>' + ic("lock", "b14") + __t("Kill switch") + "</span><b>" + __t(R.killSwitch ? "On" : "Off") + "</b></div></div>";
   }
+  /* ---- order detail helpers (all optional fields: an older bot file without them still draws, with "—") ---- */
+  var dtm = function (t) { return dt(t) + " " + tm(t); };
+  function dur(ms) { var m = Math.max(0, Math.round(ms / 6e4)), h = Math.floor(m / 60), d = Math.floor(h / 24); return d ? d + "d " + (h % 24) + "h" : h ? h + "h " + (m % 60) + "m" : m + "m"; }
+  function pill(c, t) { return '<span class="pill ' + c + '">' + __t(t) + "</span>"; }
+  var WHY = { target: ["up", "Take-profit hit"], stop: ["dn", "Stop-loss hit"], time: ["nt", "Max hold time"], ai: ["ac", "Closed by AI"] };
+  var ACT = { open: ["up", "Order opened"], skip: ["dn", "Not entered"], wait: ["nt", "Waiting"], close: ["ac", "Closed by AI"], "ai-view": ["ac", "AI market view"] };
+  var RSN = { "day-trades": "Daily trade limit reached", "day-loss": "Daily loss limit reached", "max-positions": "Max positions reached", spread: "Spread too wide", chase: "Price already ran too far", "stop-size": "Stop distance out of range",
+    depth: "Order book too thin", "open-risk": "Total open risk too high", cooldown: "Cooling down after a recent trade", "no-cash": "Not enough cash", halted: "Bot halted (drawdown)", kill: "Kill switch on", "round-limit": "Max new orders this round",
+    "ai-skip": "AI chose not to enter", "ai-unavailable": "AI unavailable, will retry", "ai-invalid": "AI answer unusable, will retry", "ai-budget": "AI daily call budget used", "no-book": "No order book data", ai: "AI decided to buy", "already-open": "Already holding this coin" };
+  function by(x) { return x.by === "ai" ? pill("ac", "AI") : pill("nt", "Rules"); }
+  function who(x) { return x.aiWhy ? '<div class="why">' + esc(x.aiWhy) + (x.aiModel ? " <small>· " + esc(x.aiModel) + (x.aiConf != null ? " · " + Math.round(x.aiConf * 100) + "%" : "") + "</small>" : "") + "</div>" : ""; }
+  function ordr(x) { return '<span class="pill up">' + __t("BUY") + '</span> <small class="mu">' + __t("Spot") + " · " + __t("No leverage") + " (1x)</small>"; }
+  function pctS(v) { return v == null || !isFinite(v) ? "" : ' <small class="mu">(' + (v >= 0 ? "+" : "") + f(v) + "%)</small>"; }
   function openT() {
     if (!S.open.length) return '<div class="empty">' + __t("No open positions") + "</div>";
-    return "<table><thead><tr><th>" + ["Coin", "Frame", "SL · price · TP", "Entry", "Current", "Open P/L"].map(function (x) { return __t(x); }).join("</th><th>") + "</th></tr></thead><tbody>" + S.open.map(function (x) {
-      var q = pos(x), rngW = x.tp - x.sl || 1, pp = Math.max(0, Math.min(1, (q.price - x.sl) / rngW)), et = Math.max(0, Math.min(1, (x.entry - x.sl) / rngW)), c = q.pnl >= 0 ? "up" : "dn";
-      return "<tr><td>" + coin(x.coin) + '</td><td><span class="tf">' + esc(x.tf) + '</span></td><td><span class="rng"><u style="left:' + et * 100 + '%"></u><i style="left:' + pp * 100 + '%"></i></span></td><td>' + f(x.entry, 3) + "</td><td>" + f(q.price, 3) + '</td><td class="' + c + '">' + sg(q.pnl) + " <small>(" + (q.pct >= 0 ? "+" : "") + f(q.pct) + "%)</small></td></tr>";
+    var H = ["Coin", "Order", "Opened", "Entry", "Stop-loss", "Take-profit", "Current", "Open P/L", "Size · risk", "Decided by"];
+    return "<table><thead><tr><th>" + H.map(function (x) { return __t(x); }).join("</th><th>") + "</th></tr></thead><tbody>" + S.open.map(function (x) {
+      var q = pos(x), rngW = x.tp - x.sl || 1, pp = Math.max(0, Math.min(1, (q.price - x.sl) / rngW)), et = Math.max(0, Math.min(1, (x.entry - x.sl) / rngW)), c = q.pnl >= 0 ? "up" : "dn",
+        slp = x.slPct != null ? x.slPct : (x.sl / x.entry - 1) * 100, tpp = x.tpPct != null ? x.tpPct : (x.tp / x.entry - 1) * 100,
+        opened = x.entryTime ? dtm(x.entryTime) + '<br><small class="mu">' + __t("{d} ago", { d: dur(Date.now() - x.entryTime) }) + (x.expiry ? " · " + __t("exit by {t}", { t: tm(x.expiry) }) : "") + "</small>" : "—",
+        sz = x.notional != null ? "$" + f(x.notional, 0) + '<br><small class="mu">' + __t("risk {v}", { v: "$" + f(x.riskAmt || 0, 0) }) + "</small>" : "—";
+      return "<tr><td>" + coin(x.coin) + ' <span class="tf">' + esc(x.tf) + "</span></td><td>" + ordr(x) + "</td><td>" + opened + "</td><td>" + f(x.entry, 3) + '</td><td class="dn">' + f(x.sl, 3) + pctS(slp) + '</td><td class="up">' + f(x.tp, 3) + pctS(tpp) +
+        '</td><td>' + f(q.price, 3) + '</td><td class="' + c + '">' + sg(q.pnl) + pctS(q.pct) + "</td><td>" + sz + "</td><td>" + by(x) + "</td></tr>" +
+        (x.aiWhy || x.rule ? '<tr class="dr"><td colspan="10">' + (x.rule ? '<small class="mu">' + __t("Signal") + ": " + esc(x.rule) + "</small> " : "") + who(x) + "</td></tr>" : "");
     }).join("") + "</tbody></table>";
   }
   function histT() {
     if (!S.closed.length) return '<div class="empty">' + __t("No closed trades yet") + "</div>";
-    return "<table><thead><tr><th>" + ["Date", "Coin", "Frame", "Result (R)", "P/L"].map(function (x) { return __t(x); }).join("</th><th>") + "</th></tr></thead><tbody>" + S.closed.slice().sort(function (a, b) { return b.t - a.t; }).map(function (x) {
-      var c = x.r > 0 ? "up" : "dn"; return '<tr><td style="font-family:var(--m);font-weight:400;font-size:11px">' + dt(x.t) + "</td><td>" + esc(x.coin) + '</td><td><span class="tf">' + esc(x.tf) + '</span></td><td class="' + c + '">' + (x.r > 0 ? "+" : "") + f(x.r, 1) + 'R</td><td class="' + c + '">' + sg(x.pnl) + "</td></tr>";
+    var H = ["Closed", "Coin", "Order", "Entry → Exit", "Stop-loss · Take-profit", "Held", "Outcome", "Result (R)", "P/L", "Decided by"];
+    return "<table><thead><tr><th>" + H.map(function (x) { return __t(x); }).join("</th><th>") + "</th></tr></thead><tbody>" + S.closed.slice().sort(function (a, b) { return b.t - a.t; }).map(function (x) {
+      var c = x.r > 0 ? "up" : "dn", w = WHY[x.why];
+      return '<tr><td style="font-family:var(--m);font-weight:400;font-size:11px">' + dtm(x.t) + "</td><td>" + esc(x.coin) + ' <span class="tf">' + esc(x.tf) + "</span></td><td>" + ordr(x) + "</td><td>" + (x.entry != null ? f(x.entry, 3) + " → " + f(x.exit, 3) : "—") + "</td><td>" +
+        (x.sl != null ? '<span class="dn">' + f(x.sl, 3) + '</span> · <span class="up">' + f(x.tp, 3) + "</span>" : "—") + "</td><td>" + (x.entryTime ? dur(x.t - x.entryTime) : "—") + "</td><td>" + (w ? pill(w[0], w[1]) : "—") + '</td><td class="' + c + '">' + (x.r > 0 ? "+" : "") + f(x.r, 1) + 'R</td><td class="' + c + '">' + sg(x.pnl) + "</td><td>" + (x.by ? by(x) : "—") + "</td></tr>" +
+        (x.aiWhy ? '<tr class="dr"><td colspan="10">' + who(x) + "</td></tr>" : "");
+    }).join("") + "</tbody></table>";
+  }
+  /* lifecycle: signal -> AI decides -> order open -> closed (and how). Counts come from the state, nothing is typed in. */
+  function flow() {
+    var o = { target: 0, stop: 0, time: 0, ai: 0 }; S.closed.forEach(function (x) { if (o[x.why] != null) o[x.why]++; });
+    var st = function (l, n, c) { return '<div class="fl ' + (c || "") + '"><b>' + n + "</b><span>" + __t(l) + "</span></div>"; }, ar = '<i class="fa">›</i>';
+    return '<div class="flow">' + st("Candidates", S.signals.length) + ar + st("AI decides", (S.decisions || []).filter(function (d) { return d.action === "open" || d.action === "skip"; }).length) + ar + st("Open orders", S.open.length, "ac") + ar +
+      st("Take-profit", o.target, "up") + st("Stop-loss", o.stop, "dn") + st("Max hold time", o.time) + st("Closed by AI", o.ai, "ac") + "</div>";
+  }
+  function aiCard() {
+    var A = S.ai; if (!A) return "";
+    if (A.mode !== "decide") return card("AI engine", "signal", null, '<div class="set"><div class="sr">' + __t("Decides orders") + "<b>" + __t("Rules (AI off)") + "</b></div></div>");
+    var l = A.last, rows = [["Decides orders", __t("AI")], ["Providers (priority)", (A.providers || []).map(esc).join(" → ") || "—"]];
+    if (l) {
+      rows.push(["Last AI run", dtm(l.t) + " · " + (l.ok ? '<span class="up">' + __t("OK") + "</span>" : '<span class="dn">' + __t("Unavailable") + "</span>")]);
+      if (l.ok) { rows.push(["Answered by", esc(l.provider + "/" + l.model) + (l.ms ? " · " + Math.round(l.ms / 100) / 10 + "s" : "")]); rows.push(["Candidates → picked", l.candidates + " → " + l.picked]); }
+      else if (l.why) rows.push(["Reason", esc(l.why)]);
+      if (l.view) rows.push(["AI market view", esc(l.view)]);
+      if (l.noTrade) rows.push(["Why no trade", esc(l.noTrade)]);
+    } else rows.push(["Last AI run", "—"]);
+    return card("AI engine", "signal", null, '<div class="set">' + rows.map(function (x) { return '<div class="sr"><span>' + __t(x[0]) + '</span><b class="wr">' + x[1] + "</b></div>"; }).join("") + "</div>");
+  }
+  function decT() {
+    var d = (S.decisions || []).slice().sort(function (a, b) { return b.t - a.t; });
+    if (!d.length) return '<div class="empty">' + __t("No decisions yet") + "</div>";
+    return "<table><thead><tr><th>" + ["Time", "Coin", "Outcome", "Why", "AI note"].map(function (x) { return __t(x); }).join("</th><th>") + "</th></tr></thead><tbody>" + d.map(function (x) {
+      var a = ACT[x.action] || ["nt", x.action], rs = RSN[x.reason], why = x.action === "ai-view" ? "" : rs ? __t(rs) : (x.reason ? esc(x.reason) : "");
+      return '<tr><td style="font-family:var(--m);font-weight:400;font-size:11px">' + dtm(x.t) + "</td><td>" + (x.coin ? esc(x.coin) + (x.tf ? ' <span class="tf">' + esc(x.tf) + "</span>" : "") : "—") + "</td><td>" + pill(a[0], a[1]) + '</td><td class="pl">' + why +
+        '</td><td class="pl wr">' + (x.why ? esc(x.why) : "") + (x.provider ? ' <small class="mu">· ' + esc(x.provider) + (x.conf != null ? " · " + Math.round(x.conf * 100) + "%" : "") + "</small>" : "") + "</td></tr>";
     }).join("") + "</tbody></table>";
   }
   function sigT() {
@@ -131,7 +183,12 @@
     return rows.length ? '<div class="act">' + rows.join("") + "</div>" : '<div class="empty">' + __t("No activity yet") + "</div>";
   }
   function sets() {
-    var rows = [["Mode", "Paper (virtual money)"], ["Direction", "Spot, long only"], ["Risk per trade", "1% equity"], ["Max positions", String(S.risk.maxPositions)], ["Daily loss limit", pc(S.risk.dayLimit / S.start, 0)], ["Timeframes", "1H, 4H"]];
+    var R = S.rules, rk = S.risk, rows;
+    if (R) rows = [["Mode", "Paper (virtual money)"], ["Market", R.market === "spot" ? "Spot" : String(R.market)], ["Direction", "BUY only (long) · no short selling"], ["Leverage", "None (1x)"],
+      ["Decides orders", R.decider === "ai" ? "AI" : "Rules"], ["Stop-loss", __t("{n} ATR below entry", { n: R.stopAtr })], ["Take-profit", __t("{n} ATR above entry", { n: R.targetAtr })], ["Max hold", __t("{n} candles", { n: R.maxHoldCandles })],
+      ["Risk per trade", pc(R.riskPct, 1) + " " + __t("equity")], ["Max size per trade", pc(R.maxNotionalPct, 0) + " " + __t("equity")], ["Fee per side", pc(R.feePct, 2)], ["Max positions", String(R.maxPositions)],
+      ["Max new orders per day", String(R.maxTradesPerDay)], ["Daily loss limit", pc(R.dayLossPct, 0)], ["Drawdown halt", pc(R.drawdownLimit, 0)], ["Timeframes", (R.tfs || []).join(", ")]];
+    else rows = [["Mode", "Paper (virtual money)"], ["Direction", "Spot, long only"], ["Risk per trade", "1% equity"], ["Max positions", String(rk.maxPositions)], ["Daily loss limit", pc(rk.dayLimit / S.start, 0)], ["Timeframes", "1H, 4H"]];
     return '<div class="set">' + rows.map(function (x) { return '<div class="sr">' + __t(x[0]) + "<b>" + __t(x[1]) + "</b></div>"; }).join("") + "</div>";
   }
   var PAGES = {
@@ -140,18 +197,21 @@
         kpi("Total P/L", "chart-area", sg(c.total), __t("{pct} · open {v}", { pct: (c.total >= 0 ? "+" : "") + f(c.total / S.start * 100) + "%", v: sg(c.openPnl) }), c.total >= 0 ? "up" : "dn") +
         kpi("Win rate", "check", f(c.win * 100, 1) + "%", __t("Closed trades: {n}", { n: c.n })) +
         kpi("Expectancy / trade", "signal", (c.exp >= 0 ? "+" : "") + f(c.exp) + "R", __t("Profit factor {v}", { v: c.pf == null ? "—" : f(c.pf) }), c.exp >= 0 ? "up" : "dn") + "</div>" +
+        card("Order flow", "list", null, flow()) +
         '<div class="grid g2">' + card("Equity", "chart-area", null, chart(), "", seg()) + card("Risk today", "warning", null, risk()) + "</div>" +
-        '<div class="grid g2">' + card("Open positions", "portfolio", S.open.length + " / " + S.risk.maxPositions, openT(), " tb") + card("Recent activity", "clock", null, logL()) + "</div>";
+        card("Open positions", "portfolio", S.open.length + " / " + S.risk.maxPositions, openT(), " tb") +
+        '<div class="grid g2b">' + aiCard() + card("Recent activity", "clock", null, logL()) + "</div>";
     },
-    positions: function () { return card("Open positions", "portfolio", S.open.length + " / " + S.risk.maxPositions, openT(), " tb"); },
-    history: function () { return card("History", "list", __t("Trades: {n}", { n: S.closed.length }), histT(), " tb"); },
+    positions: function () { return card("Order flow", "list", null, flow()) + card("Open positions", "portfolio", S.open.length + " / " + S.risk.maxPositions, openT(), " tb"); },
+    decisions: function () { return aiCard() + card("AI decisions", "signal", (S.decisions || []).length, decT(), " tb"); },
+    history: function () { return card("Order flow", "list", null, flow()) + card("History", "list", __t("Trades: {n}", { n: S.closed.length }), histT(), " tb"); },
     signals: function () { return card("Signals", "bar-top", S.signals.length, sigT(), " tb"); },
     risk: function () { return card("Risk today", "warning", null, risk()); },
     log: function () { return card("Log", "clock", null, logL()); },
     settings: function () { return card("Settings", "settings", __t("read only"), sets()); }
   };
   function nav() {
-    var n1 = [["overview", "gauge", "Overview"], ["positions", "portfolio", "Open positions", S ? S.open.length : ""], ["history", "list", "History", S ? S.closed.length : ""], ["signals", "bar-top", "Signals", S ? S.signals.length : ""]],
+    var n1 = [["overview", "gauge", "Overview"], ["positions", "portfolio", "Open positions", S ? S.open.length : ""], ["history", "list", "History", S ? S.closed.length : ""], ["decisions", "signal", "AI decisions", S ? (S.decisions || []).length : ""], ["signals", "bar-top", "Signals", S ? S.signals.length : ""]],
       n2 = [["risk", "warning", "Risk"], ["log", "clock", "Log"], ["settings", "settings", "Settings"]];
     function h(a) { return a.map(function (x) { return '<a class="sbi" data-p="' + x[0] + '" href="#' + x[0] + '">' + ic(x[1]) + __t(x[2]) + (x[3] !== "" && x[3] != null ? "<em>" + x[3] + "</em>" : "") + "</a>"; }).join(""); }
     $("nav1").innerHTML = h(n1); $("nav2").innerHTML = h(n2);

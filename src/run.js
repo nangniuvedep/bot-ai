@@ -4,10 +4,10 @@
    5 optional AI veto   6 save ledger + state + decision journal. One round at a time (workflow concurrency). */
 "use strict";
 const fs = require("fs"), path = require("path");
-const AR = require("./app-reader.js"), BN = require("./binance.js"), B = require("./bot.js"), SB = require("./state-builder.js"), AI = require("./ai-gate.js"), { validate } = require("./state-contract.js");
+const AR = require("./app-reader.js"), BN = require("./binance.js"), B = require("./bot.js"), SB = require("./state-builder.js"), AI = require("./ai-gate.js"), AD = require("./ai-decider.js"), { validate } = require("./state-contract.js");
 const CFG = JSON.parse(fs.readFileSync(path.join(__dirname, "../config/bot-config.json"), "utf8"));
 
-async function round({ ledger, cfg = CFG, now = Date.now(), fetchFn = fetch, readApp, aiFn = null, say = () => {}, verbose = false }) {
+async function round({ ledger, cfg = CFG, now = Date.now(), fetchFn = fetch, readApp, aiFn = null, env = process.env, say = () => {}, verbose = false }) {
   const L = ledger || B.newLedger(cfg, now), md = (f) => (pair, from, to) => BN.klines1m(pair, from, to, now, f), decisions = [];
   const dec = (c, action, reason, extra = {}) => decisions.push({ t: now, key: c.key, coin: c.sym, tf: c.tf, rule: c.rule, edgePts: c.edge != null ? +(c.edge * 100).toFixed(2) : undefined, action, reason, ...extra });
   const once = (c, reason) => { const k = c.key + "|w:" + reason; if (L.seen[k]) return false; L.seen[k] = now; return true; };
@@ -18,7 +18,11 @@ async function round({ ledger, cfg = CFG, now = Date.now(), fetchFn = fetch, rea
   try { app = await (readApp ? readApp() : readAppFiles(fetchFn, now)); } catch (e) { why = String((e && e.message) || e); }
   const rows = [], counts = { a: 0, b: 0, c: 0 }; let fresh = 0;
   if (!app) say("no new entries this round: " + why);
-  else {
+  else if (cfg.ai.mode === "decide") {
+    if (verbose) diagnose(app, cfg, now, say);
+    try { await AD.decideRound({ L, cfg, app, now, fetchFn, env, aiFn, say, decisions, rows, counts }); }
+    catch (e) { say("AI round failed, no new entries: " + String((e && e.message) || e)); decisions.push({ t: now, action: "wait", reason: "ai-error", detail: String((e && e.message) || e).slice(0, 200) }); }
+  } else {
     if (verbose) diagnose(app, cfg, now, say);
     const all = B.findCandidates(app, cfg, L, now);
     all.filter((c) => c.late).forEach((c) => say(`${c.tf}: entry candle too old, skipped`));
@@ -54,6 +58,8 @@ async function round({ ledger, cfg = CFG, now = Date.now(), fetchFn = fetch, rea
       else refuse(res);
     }
   }
+  L.recent = (L.recent || []).concat(decisions.filter((d) => d.action && d.action !== "rule-paused").map((d) => ({ t: d.t, coin: d.coin, tf: d.tf, rule: d.rule, action: d.action, reason: d.reason,
+    why: String((d.ai && d.ai.why) || d.detail || (d.action === "close" && d.reason) || (d.action === "ai-view" && d.reason) || "").slice(0, 200), conf: d.ai && d.ai.confidence != null ? d.ai.confidence : undefined, conv: d.ai && d.ai.conviction, provider: d.provider, model: d.model }))).slice(-80);
   B.logAdd(L, cfg, now, "run", counts);
   B.finishRound(L, cfg, now);
   const state = SB.build(L, cfg, now, rows), v = validate(state);
@@ -95,7 +101,8 @@ if (require.main === module) {
   (async () => {
     let ledger = null, aiFn = null;
     if (fs.existsSync(lp)) { try { ledger = JSON.parse(fs.readFileSync(lp, "utf8")); } catch (e) { console.error("ledger is not valid JSON, refusing to overwrite: " + lp); process.exit(1); } }
-    if (CFG.ai.mode === "veto") { try { aiFn = require("./ai-provider.js"); } catch (e) { console.log("· AI mode is veto but src/ai-provider.js is missing: candidates will wait (see ai-provider.example.js)"); } }
+    if (CFG.ai.mode === "decide") console.log("· AI mode = decide: providers " + CFG.ai.providers.map((p) => p.type + "/" + p.model + (require("./ai-provider.js").hasKey(p, process.env) ? "" : " (NO KEY)")).join(" → "));
+    if (CFG.ai.mode === "veto") { console.log("· AI mode veto needs its own aiFn; the built-in providers serve mode \"decide\" — candidates will wait"); }
     const { ledger: L, state, decisions } = await round({ ledger, aiFn, verbose: a.includes("--verbose"), say: (m) => console.log("· " + m) });
     console.log(`round done · equity ${state.equity[state.equity.length - 1][1].toFixed(2)} · open ${state.open.length} · closed ${state.closed.length} · status ${state.status} · decisions ${decisions.length}`);
     if (dry) return console.log("(dry: nothing written)");
