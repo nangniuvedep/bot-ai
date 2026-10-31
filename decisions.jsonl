@@ -49,3 +49,4 @@
 {"t":1793456192219,"key":"XLM|1H|1793455200000","coin":"XLM","tf":"1H","rule":"AO-04","edgePts":2.52,"action":"wait","reason":"round-limit"}
 {"t":1793456192219,"key":"INJ|1H|1793455200000","coin":"INJ","tf":"1H","rule":"AO-04","edgePts":2.52,"action":"wait","reason":"round-limit"}
 {"t":1793456192219,"key":"INTWB|1H|1793455200000","coin":"INTWB","tf":"1H","rule":"AO-04","edgePts":2.52,"action":"wait","reason":"round-limit"}
+{"t":1793458454487,"action":"wait","reason":"ai-unavailable","detail":"gemini no-key | worker-ai no-key | worker-ai no-key | workers-ai no-key"}
