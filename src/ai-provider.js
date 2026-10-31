@@ -64,10 +64,12 @@ const hasKey = (p, env) => p.type === "worker-ai" ? !!(env[p.urlEnv || "AI_PROXY
 
 async function call(cfg, prompt, { env = process.env, fetchFn = fetch, L = null, now = Date.now() } = {}) {
   const a = cfg.ai, off = L ? (L.aiOff = L.aiOff || {}) : {}, tried = [];
+  /* a.clearPausesBefore (epoch ms): drop pauses that were set before that moment (used after fixing a provider bug, so it is tried again at once) */
+  if (a.clearPausesBefore) for (const id of Object.keys(off)) if (off[id] - (off[id + "|len"] || (a.pauseMin || 30) * 6e4) < a.clearPausesBefore) { delete off[id]; delete off[id + "|len"]; }
   for (const p of a.providers || []) {
     const id = p.type + ":" + p.model;
     if (!hasKey(p, env)) { tried.push(p.type + " no-key"); continue; }
-    if ((off[id] || 0) > now) { tried.push(p.type + " paused"); continue; }
+    if ((off[id] || 0) > now) { tried.push(p.type + " paused until " + new Date(off[id]).toISOString().slice(11, 16) + "Z"); continue; }
     const t0 = Date.now();
     try {
       const text = await once(p, prompt, { env, fetchFn, timeoutMs: a.timeoutMs, maxTokens: a.maxOutputTokens });
@@ -75,7 +77,8 @@ async function call(cfg, prompt, { env = process.env, fetchFn = fetch, L = null,
       return { ok: true, text: String(text), provider: p.type, model: p.model, ms: Date.now() - t0 };
     } catch (e) {
       const msg = clip((e && e.message) || e, 170); tried.push(p.type + " " + msg);
-      off[id] = now + (a.pauseMin || 30) * 6e4;   // rotate: do not hammer a provider that just failed / hit its free limit
+      const len = /^empty answer|not JSON/.test(msg) ? (a.shortPauseMin || 3) * 6e4 : (a.pauseMin || 30) * 6e4;   // bad/empty answer = format problem: retry soon; HTTP/429/timeout = full pause
+      off[id] = now + len; off[id + "|len"] = len;   // rotate: do not hammer a provider that just failed / hit its free limit
     }
   }
   return { ok: false, why: tried.length ? tried.join(" | ") : "no providers configured" };

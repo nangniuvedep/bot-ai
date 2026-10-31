@@ -54,7 +54,7 @@ const go = (o) => round({ cfg: mk(), now: NOW, fetchFn, readApp: async () => app
   assert.strictEqual(r.ledger.open.length, 0); assert.strictEqual(r.ledger.closed[0].why, "ai"); const cs = r.state.closed[0]; assert(cs.entry > 0 && cs.exit > 0 && cs.entryTime && cs.sl < cs.entry && cs.by === "ai" && cs.aiWhy === "trend broke", JSON.stringify(cs)); assert(r.decisions.some((d) => d.action === "close" && d.coin === "AAA"));
 
   // 7. providers: priority order, missing key skipped, 429 rotates and pauses the failed one
-  const cfg = mk(), L = B.newLedger(cfg, NOW), seen = [];
+  const cfg = mk(), L = B.newLedger(cfg, NOW), seen = []; cfg.ai.clearPausesBefore = 0;   // (the shipped config clears old pauses once; this test is about pausing)
   const f = async (url) => { seen.push(url); if (url.includes("generativelanguage")) return { ok: false, status: 429, text: async () => "quota" };
     return { ok: true, json: async () => ({ result: { response: '{"entries":[],"close":[]}' } }) }; };
   const env = { GEMINI_API_KEY: "k", CF_ACCOUNT_ID: "acc", CF_API_TOKEN: "t" };

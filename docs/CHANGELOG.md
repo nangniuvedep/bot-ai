@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## 2026-10-31 (đêm) — V7.2: bỏ lệnh nghỉ cũ, nghỉ ngắn khi phản hồi rỗng
+- Vòng chạy sau V7.1 (41214419411) cho thấy `worker-ai paused`: lỗi `empty answer` của V7 đã bị lưu trong sổ lệnh kèm nghỉ 30 phút nên V7.1 chưa được thử thật.
+- `ai-provider.js`: lỗi `empty answer`/`not JSON` chỉ nghỉ `ai.shortPauseMin` (3 phút); HTTP/429/timeout vẫn nghỉ `ai.pauseMin` (30). `ai.clearPausesBefore` (epoch ms) xóa lệnh nghỉ đặt trước mốc đó (đặt 2026-10-31 15:25Z). Log `paused until HH:MMZ`.
+
 ## 2026-10-31 (đêm) — V7.1: sửa AI trả "empty answer"
 - Phát hiện sau khi V7 lên (commit 162f90a, vòng 41214156444 `success`): cả `worker-ai/gpt-oss-120b` và `worker-ai/gemma-4` trả `empty answer` → AI chưa quyết định được gì. Nguyên nhân CHƯA xác nhận (chưa thấy phản hồi thật): nghi model suy luận trả định dạng khác hoặc hết 1500 token trong phần suy luận.
 - `ai-provider.js`: `textOf()` đọc mọi dạng (`response`, `choices[].message.content` chuỗi/mảng, `output_text`, `output[]` kiểu Responses, `reasoning_content` chứa JSON khi bị cắt); `why()` ghi hình dạng phản hồi vào log (`keys`, `finish`, `msg`, `reasoning`, `out_tokens`). Config: `maxOutputTokens` 1500 → 3500, `timeoutMs` 60000 → 90000.

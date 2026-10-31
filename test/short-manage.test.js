@@ -107,5 +107,13 @@ const kl = (rows) => async () => ({ ok: true, data: rows.map(([t, o, h, l, c]) =
   const okp = await AP.call(cfgp, { system: "s", user: "u" }, { env: { AI_PROXY_URL: "https://x", AI_PROXY_TOKEN: "t" }, fetchFn: async () => ({ ok: true, json: async () => ({ result: { choices: [{ message: { content: J } }] } }) }) }); assert(okp.ok && okp.text === J);
   const bad = await AP.call(cfgp, { system: "s", user: "u" }, { env: { AI_PROXY_URL: "https://x", AI_PROXY_TOKEN: "t" }, fetchFn: async () => ({ ok: true, json: async () => ({ result: { id: "1", choices: [{ finish_reason: "length", message: { content: "" } }] } }) }) });
   assert(!bad.ok && /empty answer/.test(bad.why) && /finish=length/.test(bad.why), bad.why);
+  // 11. pauses: empty answer pauses briefly (not 30 min); an old pause is cleared by clearPausesBefore; HTTP errors keep the full pause
+  const Lp = { aiOff: {} }, envp = { AI_PROXY_URL: "https://x", AI_PROXY_TOKEN: "t" }, c2 = JSON.parse(JSON.stringify(cfgp)); c2.ai.pauseMin = 30; c2.ai.shortPauseMin = 3;
+  await AP.call(c2, { system: "s", user: "u" }, { env: envp, L: Lp, now: 1e12, fetchFn: async () => ({ ok: true, json: async () => ({ result: { choices: [{ message: { content: "" } }] } }) }) });
+  assert.strictEqual(Lp.aiOff["worker-ai:@cf/x/y"], 1e12 + 3 * 6e4, "empty answer = 3 min pause");
+  await AP.call(c2, { system: "s", user: "u" }, { env: envp, L: Lp, now: 1e12 + 4 * 6e4, fetchFn: async () => ({ ok: false, status: 429, text: async () => "slow down" }) });
+  assert.strictEqual(Lp.aiOff["worker-ai:@cf/x/y"], 1e12 + 4 * 6e4 + 30 * 6e4, "HTTP 429 = full pause");
+  c2.ai.clearPausesBefore = 1e12 + 10 * 6e4; const again2 = await AP.call(c2, { system: "s", user: "u" }, { env: envp, L: Lp, now: 1e12 + 11 * 6e4, fetchFn: async () => ({ ok: true, json: async () => ({ result: { response: J } }) }) });
+  assert(again2.ok, "pause set before clearPausesBefore is dropped");
   console.log("short-manage: all tests passed");
 })().catch((e) => { console.error(e); process.exit(1); });

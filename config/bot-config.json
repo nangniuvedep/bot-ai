@@ -67,7 +67,9 @@
         "accountEnv": "CF_ACCOUNT_ID",
         "keyEnv": "CF_API_TOKEN"
       }
-    ]
+    ],
+    "clearPausesBefore": 1793460300000,
+    "shortPauseMin": 3
   },
   "allowShort": true,
   "shortSizeMult": 0.5,

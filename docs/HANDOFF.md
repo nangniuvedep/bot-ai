@@ -3,6 +3,7 @@
 **Chat mới / AI mới: đọc file này, rồi `docs/DEPLOYED.md` (luật 2 tài khoản Cloudflare), rồi mới làm.**
 
 ## 0a. TÌNH TRẠNG MỚI NHẤT (31/10 đêm)
+- V7.1 đã lên (c1b0e8b) nhưng vòng sau đó báo `worker-ai paused` (lệnh nghỉ 30 phút từ lỗi cũ). V7.2 (trong ZIP) xóa lệnh nghỉ cũ + nghỉ ngắn 3 phút cho phản hồi rỗng. Đẩy: `bash ~/Downloads/Bot-AI-V4/scripts/day-v7-len.sh "V7.2"` rồi đọc log.
 - V7 ĐÃ lên GitHub `main` (162f90a) và trang Pages; vòng 41214156444 `success`.
 - **LỖI ĐANG MỞ:** log `AI unavailable: gemini no-key | worker-ai empty answer | worker-ai empty answer | workers-ai no-key`. AI chưa trả lời được. V7.1 (trong ZIP này) sửa cách đọc phản hồi + tăng token + log chẩn đoán; **chưa đẩy lên**. Đẩy: `bash ~/Downloads/Bot-AI-V4/scripts/day-v7-len.sh "V7.1: fix AI empty answer"`, rồi đọc dòng `AI unavailable` hoặc `ENTERED` trong log.
 - Nếu vẫn `empty answer`: dòng log giờ ghi `keys/finish/reasoning/out_tokens`. `finish=length` → tăng `maxOutputTokens` hoặc đổi model; `keys=` lạ → thêm dạng vào `textOf()`. Phương án dự phòng: đặt khóa `GEMINI_API_KEY` (nhà số 1) bằng `gh secret set GEMINI_API_KEY --repo nangniuvedep/bot-ai`.
