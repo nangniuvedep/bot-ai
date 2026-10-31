@@ -1,4 +1,7 @@
-# Trạng thái triển khai — V4 (2026-10-31) — không chứa bí mật
+# Trạng thái triển khai — V6.1 (2026-10-31) — không chứa bí mật
+
+> Cập nhật V7 (chưa deploy): short mô phỏng + quản lý SL/TP + trang Performance, xem `docs/HANDOFF.md` mục 0.
+> Cập nhật V6.1: thêm Worker AI `bot-ai-llm` (tài khoản PHỤ), secret GitHub `AI_PROXY_URL`/`AI_PROXY_TOKEN`, trang UI V6 đã deploy. Việc kế tiếp và lệnh hay dùng: xem `docs/HANDOFF.md`.
 
 **AI/người đọc sau: đọc file này TRƯỚC khi deploy hay sửa bất cứ thứ gì trên Cloudflare/GitHub.**
 
@@ -16,6 +19,7 @@ GitHub: tài khoản `nangniuvedep` (`gh auth status`).
 |---|---|
 | Repo bot (công khai) | `github.com/nangniuvedep/bot-ai` — nhánh `main` (mã), `bot-data` (sổ lệnh: `ledger.json`, `bot-state.json`, `decisions.jsonl`) |
 | Workflow | `.github/workflows/bot.yml` (tên `bot-ai`), cron `8,23,38,53 * * * *` (sau máy quét 01/16/31/46). Chạy tay: `gh workflow run bot.yml --repo nangniuvedep/bot-ai` |
+| Worker AI (V6.1) | `bot-ai-llm` → `https://bot-ai-llm.nangniuvedep.workers.dev` (POST, Bearer `AI_TOKEN`; secret GitHub `AI_PROXY_URL`/`AI_PROXY_TOKEN`) — tài khoản PHỤ |
 | Worker giữ state | `bot-ai-state` → `https://bot-ai-state.nangniuvedep.workers.dev/state.json` (KV `STATE`, id `027ef8e5bd9a49ae8e7f6068958e6033`) — tài khoản PHỤ |
 | Secret trên Worker | `WRITE_TOKEN` (bản lưu máy chủ dự án: `~/.bot-ai-token`; không ở trong repo) |
 | Secret trên GitHub (repo bot) | `BOT_STATE_URL` = `https://bot-ai-state.nangniuvedep.workers.dev`, `BOT_STATE_TOKEN` = cùng giá trị `WRITE_TOKEN` |
@@ -26,7 +30,7 @@ GitHub: tài khoản `nangniuvedep` (`gh auth status`).
 - Deploy lại Worker: `cd worker && npx wrangler deploy`
 - Đổi token: `openssl rand -hex 32 > ~/.bot-ai-token`, rồi `cd worker && npx wrangler secret put WRITE_TOKEN` và `gh secret set BOT_STATE_TOKEN --repo nangniuvedep/bot-ai` (cùng giá trị)
 - Deploy lại trang: `npx wrangler pages deploy ui --project-name bot-ai-ui --branch main`
-- Chạy test: `for t in test/*.test.js; do node $t; done` (4 bộ, không cần mạng)
+- Chạy test: `for t in test/*.test.js; do node $t; done` (6 bộ, không cần mạng)
 - Chạy thử bot không ghi: `node src/run.js --dry --verbose`
 - Tắt khẩn cấp: `"killSwitch": true` trong `config/bot-config.json` rồi commit; hoặc `gh workflow disable bot.yml --repo nangniuvedep/bot-ai`
 - Xem state công khai: `curl -s https://bot-ai-state.nangniuvedep.workers.dev/state.json`

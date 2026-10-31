@@ -72,11 +72,11 @@
   var LOGT = { /* English templates; the bot sends only a key + values (never sentences) */
     run: ["check", "Run complete · candidates {a} · waiting {b} · watching {c}"],
     cand: ["signal", "Candidate <b>{coin}</b> {tf} · {rule} passed both stages"],
-    open: ["portfolio", "Opened BUY <b>{coin}</b> {tf} at {price} · spot, no leverage · risk {risk} equity"],
+    open: ["portfolio", "Opened {side} <b>{coin}</b> {tf} at {price} · no leverage · risk {risk} equity"],
     skip: ["warning", "Skipped <b>{coin}</b>: spread above configured limit"],
     close: ["check", "Closed <b>{coin}</b> {tf} at target · {r}"]
   };
-  var CLOSET = { stop: "Closed <b>{coin}</b> {tf} at stop · {r}", time: "Closed <b>{coin}</b> {tf} after max hold time · {r}", ai: "Closed <b>{coin}</b> {tf} early by AI · {r}" };
+  var CLOSET = { stop: "Closed <b>{coin}</b> {tf} at stop · {r}", time: "Closed <b>{coin}</b> {tf} after max hold time · {r}", ai: "Closed <b>{coin}</b> {tf} early by AI · {r}", breakeven: "Closed <b>{coin}</b> {tf} at break-even stop · {r}", trail: "Closed <b>{coin}</b> {tf} by trailing stop · {r}" };
   var VAL = { both: "Both stages green", spread: "Spread too wide" }, ST = { wait: "Waiting", watch: "Order open", skip: "Not entered" };
   function hue(s) { var h = 0, i; for (i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) % 360; return h; }
   function coin(c) { return '<span class="co"><i class="cc" style="background:hsl(' + hue(c) + ',55%,48%)">' + esc(c.slice(0, 3)) + "</i>" + esc(c) + "</span>"; }
@@ -107,14 +107,14 @@
   var dtm = function (t) { return dt(t) + " " + tm(t); };
   function dur(ms) { var m = Math.max(0, Math.round(ms / 6e4)), h = Math.floor(m / 60), d = Math.floor(h / 24); return d ? d + "d " + (h % 24) + "h" : h ? h + "h " + (m % 60) + "m" : m + "m"; }
   function pill(c, t) { return '<span class="pill ' + c + '">' + __t(t) + "</span>"; }
-  var WHY = { target: ["up", "Take-profit hit"], stop: ["dn", "Stop-loss hit"], time: ["nt", "Max hold time"], ai: ["ac", "Closed by AI"] };
-  var ACT = { open: ["up", "Order opened"], skip: ["dn", "Not entered"], wait: ["nt", "Waiting"], close: ["ac", "Closed by AI"], "ai-view": ["ac", "AI market view"] };
+  var WHY = { target: ["up", "Take-profit hit"], stop: ["dn", "Stop-loss hit"], breakeven: ["nt", "Break-even stop"], trail: ["up", "Trailing stop"], time: ["nt", "Max hold time"], ai: ["ac", "Closed by AI"] };
+  var ACT = { open: ["up", "Order opened"], skip: ["dn", "Not entered"], wait: ["nt", "Waiting"], close: ["ac", "Closed by AI"], "ai-view": ["ac", "AI market view"], manage: ["ac", "Stop/target moved"], "manage-refused": ["nt", "Change refused"] };
   var RSN = { "day-trades": "Daily trade limit reached", "day-loss": "Daily loss limit reached", "max-positions": "Max positions reached", spread: "Spread too wide", chase: "Price already ran too far", "stop-size": "Stop distance out of range",
     depth: "Order book too thin", "open-risk": "Total open risk too high", cooldown: "Cooling down after a recent trade", "no-cash": "Not enough cash", halted: "Bot halted (drawdown)", kill: "Kill switch on", "round-limit": "Max new orders this round",
-    "ai-skip": "AI chose not to enter", "ai-unavailable": "AI unavailable, will retry", "ai-invalid": "AI answer unusable, will retry", "ai-budget": "AI daily call budget used", "no-book": "No order book data", ai: "AI decided to buy", "already-open": "Already holding this coin" };
+    "ai-skip": "AI chose not to enter", "ai-unavailable": "AI unavailable, will retry", "ai-invalid": "AI answer unusable, will retry", "ai-budget": "AI daily call budget used", "no-book": "No order book data", ai: "AI opened a position", "short-disabled": "Short selling is off", "stop-not-tighter": "Stop can only be tightened", "stop-too-close": "Stop too close to price", "target-not-further": "Target can only be pushed further", "target-needs-profit-and-breakeven": "Target needs +1R and a break-even stop", "target-too-far": "Target too far", "nothing-to-change": "Nothing to change", "already-open": "Already holding this coin" };
   function by(x) { return x.by === "ai" ? pill("ac", "AI") : pill("nt", "Rules"); }
   function who(x) { return x.aiWhy ? '<div class="why">' + esc(x.aiWhy) + (x.aiModel ? " <small>· " + esc(x.aiModel) + (x.aiConf != null ? " · " + Math.round(x.aiConf * 100) + "%" : "") + "</small>" : "") + "</div>" : ""; }
-  function ordr(x) { return '<span class="pill up">' + __t("BUY") + '</span> <small class="mu">' + __t("Spot") + " · " + __t("No leverage") + " (1x)</small>"; }
+  function ordr(x) { var sh = x.side === "SELL"; return '<span class="pill ' + (sh ? "dn" : "up") + '">' + __t(sh ? "SELL (short)" : "BUY") + '</span> <small class="mu">' + __t(sh ? "Paper short" : "Spot") + " · " + __t("No leverage") + " (1x)</small>"; }
   function pctS(v) { return v == null || !isFinite(v) ? "" : ' <small class="mu">(' + (v >= 0 ? "+" : "") + f(v) + "%)</small>"; }
   function openT() {
     if (!S.open.length) return '<div class="empty">' + __t("No open positions") + "</div>";
@@ -124,7 +124,7 @@
         slp = x.slPct != null ? x.slPct : (x.sl / x.entry - 1) * 100, tpp = x.tpPct != null ? x.tpPct : (x.tp / x.entry - 1) * 100,
         opened = x.entryTime ? dtm(x.entryTime) + '<br><small class="mu">' + __t("{d} ago", { d: dur(Date.now() - x.entryTime) }) + (x.expiry ? " · " + __t("exit by {t}", { t: tm(x.expiry) }) : "") + "</small>" : "—",
         sz = x.notional != null ? "$" + f(x.notional, 0) + '<br><small class="mu">' + __t("risk {v}", { v: "$" + f(x.riskAmt || 0, 0) }) + "</small>" : "—";
-      return "<tr><td>" + coin(x.coin) + ' <span class="tf">' + esc(x.tf) + "</span></td><td>" + ordr(x) + "</td><td>" + opened + "</td><td>" + f(x.entry, 3) + '</td><td class="dn">' + f(x.sl, 3) + pctS(slp) + '</td><td class="up">' + f(x.tp, 3) + pctS(tpp) +
+      return "<tr><td>" + coin(x.coin) + ' <span class="tf">' + esc(x.tf) + "</span></td><td>" + ordr(x) + "</td><td>" + opened + "</td><td>" + f(x.entry, 3) + '</td><td class="dn">' + f(x.sl, 3) + pctS(slp) + (x.managed && x.sl0 != null ? '<br><small class="mu">' + __t("moved from {v}", { v: f(x.sl0, 3) }) + "</small>" : "") + '</td><td class="up">' + f(x.tp, 3) + pctS(tpp) +
         '</td><td>' + f(q.price, 3) + '</td><td class="' + c + '">' + sg(q.pnl) + pctS(q.pct) + "</td><td>" + sz + "</td><td>" + by(x) + "</td></tr>" +
         (x.aiWhy || x.rule ? '<tr class="dr"><td colspan="10">' + (x.rule ? '<small class="mu">' + __t("Signal") + ": " + esc(x.rule) + "</small> " : "") + who(x) + "</td></tr>" : "");
     }).join("") + "</tbody></table>";
@@ -176,7 +176,7 @@
   }
   function logL() {
     var rows = S.log.slice().sort(function (a, b) { return b.t - a.t; }).filter(function (l) { return LOGT[l.k]; }).map(function (l) {
-      var v = {}, k; for (k in l.v || {}) v[k] = esc(l.v[k]); /* unknown keys from a newer bot are skipped, not guessed */
+      var v = {}, k; for (k in l.v || {}) v[k] = esc(l.v[k]); if (l.k === "open" && !v.side) v.side = "BUY"; if (l.k === "open" && v.risk === "managed") return ""; /* unknown keys from a newer bot are skipped, not guessed */
       var T = l.k === "close" && l.v && CLOSET[l.v.why] ? CLOSET[l.v.why] : LOGT[l.k][1];
       return '<div class="ai"><time>' + tm(l.t) + "</time>" + ic(LOGT[l.k][0], "b14") + "<div>" + __t(T, v) + "</div></div>";
     });
@@ -184,12 +184,35 @@
   }
   function sets() {
     var R = S.rules, rk = S.risk, rows;
-    if (R) rows = [["Mode", "Paper (virtual money)"], ["Market", R.market === "spot" ? "Spot" : String(R.market)], ["Direction", "BUY only (long) · no short selling"], ["Leverage", "None (1x)"],
-      ["Decides orders", R.decider === "ai" ? "AI" : "Rules"], ["Stop-loss", __t("{n} ATR below entry", { n: R.stopAtr })], ["Take-profit", __t("{n} ATR above entry", { n: R.targetAtr })], ["Max hold", __t("{n} candles", { n: R.maxHoldCandles })],
+    if (R) rows = [["Mode", "Paper (virtual money)"], ["Market", R.market === "spot" ? "Spot" : String(R.market)], ["Direction", R.side === "long-short" ? "Long and short (paper short, 1x)" : "BUY only (long) · no short selling"], ["Leverage", "None (1x)"],
+      ["Decides orders", R.decider === "ai" ? "AI" : "Rules"], ["Stop-loss", __t("{n} ATR from entry", { n: R.stopAtr })], ["Take-profit", __t("{n} ATR from entry", { n: R.targetAtr })], ["Stop management", R.manage ? __t("Break-even at +{a}R, trail from +{b}R", { a: R.manage.breakevenAtR, b: R.manage.trailAtR }) : "Off"], ["Max hold", __t("{n} candles", { n: R.maxHoldCandles })],
       ["Risk per trade", pc(R.riskPct, 1) + " " + __t("equity")], ["Max size per trade", pc(R.maxNotionalPct, 0) + " " + __t("equity")], ["Fee per side", pc(R.feePct, 2)], ["Max positions", String(R.maxPositions)],
       ["Max new orders per day", String(R.maxTradesPerDay)], ["Daily loss limit", pc(R.dayLossPct, 0)], ["Drawdown halt", pc(R.drawdownLimit, 0)], ["Timeframes", (R.tfs || []).join(", ")]];
     else rows = [["Mode", "Paper (virtual money)"], ["Direction", "Spot, long only"], ["Risk per trade", "1% equity"], ["Max positions", String(rk.maxPositions)], ["Daily loss limit", pc(rk.dayLimit / S.start, 0)], ["Timeframes", "1H, 4H"]];
     return '<div class="set">' + rows.map(function (x) { return '<div class="sr">' + __t(x[0]) + "<b>" + __t(x[1]) + "</b></div>"; }).join("") + "</div>";
+  }
+  /* fallback when the bot file has no `stats` (older bot / sample data): same numbers from the closed trades */
+  function localStats() {
+    var c = S.closed || [], n = c.length; if (!n) return null;
+    var sum = function (a, g) { return a.reduce(function (t, x) { return t + g(x); }, 0); }, w = c.filter(function (x) { return x.r > 0; }), l = c.filter(function (x) { return x.r <= 0; }), gl = -sum(l, function (x) { return x.pnl; });
+    var pk = -Infinity, dd = 0; (S.equity || []).forEach(function (q) { if (q[1] > pk) pk = q[1]; if (pk > 0) dd = Math.max(dd, (pk - q[1]) / pk); });
+    function sm(a) { return { n: a.length, win: a.filter(function (x) { return x.r > 0; }).length / a.length, expR: sum(a, function (x) { return x.r; }) / a.length, pnl: sum(a, function (x) { return x.pnl; }) }; }
+    function grp(k) { var m = {}, o = {}; c.forEach(function (x) { var g = k(x); if (g) (m[g] = m[g] || []).push(x); }); Object.keys(m).forEach(function (g) { o[g] = sm(m[g]); }); return o; }
+    var h = c.filter(function (x) { return x.entryTime; }), st = 0, bs = 0, ws = 0;
+    c.forEach(function (x) { if (x.r > 0) { st = st > 0 ? st + 1 : 1; bs = Math.max(bs, st); } else { st = st < 0 ? st - 1 : -1; ws = Math.max(ws, -st); } });
+    return { n: n, win: w.length / n, expR: sum(c, function (x) { return x.r; }) / n, avgWinR: w.length ? sum(w, function (x) { return x.r; }) / w.length : 0, avgLossR: l.length ? sum(l, function (x) { return x.r; }) / l.length : 0,
+      profitFactor: gl > 0 ? sum(w, function (x) { return x.pnl; }) / gl : null, maxDrawdown: dd, avgHoldMin: h.length ? sum(h, function (x) { return (x.t - x.entryTime) / 6e4; }) / h.length : 0, bestStreak: bs, worstStreak: ws,
+      avgMfeR: null, bySide: grp(function (x) { return x.side === "SELL" ? "short" : "long"; }), byWhy: grp(function (x) { return x.why; }), byRule: grp(function (x) { return x.rule; }) };
+  }
+  function perfP() {
+    var T = S.stats || localStats(); if (!T || !T.n) return card("Performance", "chart-area", null, '<div class="empty">' + __t("No closed trades yet") + "</div>");
+    var P = function (v) { return f(v * 100, 1) + "%"; }, Rr = function (v) { return (v >= 0 ? "+" : "") + f(v) + "R"; };
+    var k = '<div class="grid g4">' + kpi("Win rate", "check", P(T.win), __t("Closed trades: {n}", { n: T.n })) + kpi("Expectancy / trade", "signal", Rr(T.expR), __t("Profit factor {v}", { v: T.profitFactor == null ? "—" : f(T.profitFactor) }), T.expR >= 0 ? "up" : "dn") +
+      kpi("Avg win / avg loss", "list", Rr(T.avgWinR) + " / " + Rr(T.avgLossR), __t("Streak best {a} · worst {b}", { a: T.bestStreak, b: T.worstStreak })) + kpi("Max drawdown", "warning", P(T.maxDrawdown), __t("Avg hold {v}", { v: dur(T.avgHoldMin * 6e4) })) + "</div>";
+    function tbl(title, o, lab) { var rows = Object.keys(o || {}); if (!rows.length) return ""; return card(title, "list", null, "<table><thead><tr><th>" + __t("Group") + "</th><th>" + __t("Trades") + "</th><th>" + __t("Win rate") + "</th><th>" + __t("Expectancy / trade") + "</th><th>P/L</th></tr></thead><tbody>" + rows.map(function (g) { var x = o[g]; return "<tr><td>" + esc(lab ? __t(lab[g] || g) : g) + "</td><td>" + x.n + "</td><td>" + P(x.win) + '</td><td class="' + (x.expR >= 0 ? "up" : "dn") + '">' + Rr(x.expR) + '</td><td class="' + (x.pnl >= 0 ? "up" : "dn") + '">' + sg(x.pnl) + "</td></tr>"; }).join("") + "</tbody></table>", " tb"); }
+    var W = {}; Object.keys(WHY).forEach(function (q) { W[q] = WHY[q][1]; });
+    return k + '<div class="grid g2">' + tbl("By direction", T.bySide, { long: "Long", short: "Short" }) + tbl("By exit reason", T.byWhy, W) + "</div>" + tbl("By signal rule", T.byRule) +
+      (T.avgMfeR != null ? card("Exit quality", "signal", null, '<div class="sr">' + __t("Average best open profit before exit") + "<b>" + Rr(T.avgMfeR) + "</b></div>") : "");
   }
   var PAGES = {
     overview: function (c) {
@@ -202,6 +225,7 @@
         card("Open positions", "portfolio", S.open.length + " / " + S.risk.maxPositions, openT(), " tb") +
         '<div class="grid g2b">' + aiCard() + card("Recent activity", "clock", null, logL()) + "</div>";
     },
+    performance: function () { return perfP(); },
     positions: function () { return card("Order flow", "list", null, flow()) + card("Open positions", "portfolio", S.open.length + " / " + S.risk.maxPositions, openT(), " tb"); },
     decisions: function () { return aiCard() + card("AI decisions", "signal", (S.decisions || []).length, decT(), " tb"); },
     history: function () { return card("Order flow", "list", null, flow()) + card("History", "list", __t("Trades: {n}", { n: S.closed.length }), histT(), " tb"); },
@@ -211,7 +235,7 @@
     settings: function () { return card("Settings", "settings", __t("read only"), sets()); }
   };
   function nav() {
-    var n1 = [["overview", "gauge", "Overview"], ["positions", "portfolio", "Open positions", S ? S.open.length : ""], ["history", "list", "History", S ? S.closed.length : ""], ["decisions", "signal", "AI decisions", S ? (S.decisions || []).length : ""], ["signals", "bar-top", "Signals", S ? S.signals.length : ""]],
+    var n1 = [["overview", "gauge", "Overview"], ["positions", "portfolio", "Open positions", S ? S.open.length : ""], ["history", "list", "History", S ? S.closed.length : ""], ["performance", "chart-area", "Performance"], ["decisions", "signal", "AI decisions", S ? (S.decisions || []).length : ""], ["signals", "bar-top", "Signals", S ? S.signals.length : ""]],
       n2 = [["risk", "warning", "Risk"], ["log", "clock", "Log"], ["settings", "settings", "Settings"]];
     function h(a) { return a.map(function (x) { return '<a class="sbi" data-p="' + x[0] + '" href="#' + x[0] + '">' + ic(x[1]) + __t(x[2]) + (x[3] !== "" && x[3] != null ? "<em>" + x[3] + "</em>" : "") + "</a>"; }).join(""); }
     $("nav1").innerHTML = h(n1); $("nav2").innerHTML = h(n2);

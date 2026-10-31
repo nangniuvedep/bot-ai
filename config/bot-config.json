@@ -68,5 +68,19 @@
         "keyEnv": "CF_API_TOKEN"
       }
     ]
+  },
+  "allowShort": true,
+  "shortSizeMult": 0.5,
+  "shortFundingPctPerDay": 0.0003,
+  "manage": {
+    "enabled": true,
+    "breakevenAtR": 1.0,
+    "breakevenOffsetPct": 0.002,
+    "trailAtR": 1.5,
+    "trailDistR": 1.0,
+    "extendWhenWithinR": 0.5,
+    "extendByR": 1.0,
+    "maxExtends": 3,
+    "extendHoldCandles": 5
   }
 }

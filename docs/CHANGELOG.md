@@ -1,5 +1,18 @@
 # CHANGELOG
 
+## 2026-10-31 (đêm) — V7: short mô phỏng + quản lý SL/TP + trang Performance
+- **Short (paper, 1x, KHÔNG phải spot thật):** tín hiệu V8 hướng xuống nay thành ứng viên `side: short` (config `allowShort`). Vào ở bid (khớp sổ bids), stop trên giá vào, target dưới; cỡ lệnh x`shortSizeMult` (0.5); phí funding giả định `shortFundingPctPerDay` (0.03%/ngày) tính lúc đóng. Đo "xanh" của short dùng base `dn` của app. **[KIỂM]** chưa rõ bảng Validation của app có trộn hướng không → số liệu short kém chắc hơn; AI được dặn khắt khe hơn.
+- **Quản lý lệnh (`config.manage`):** +1R → dời stop về hòa vốn (+0.2% bù phí); +1.5R → stop bám đuôi (đỉnh − 1R); giá tiến gần target (<0.5R) → nới target thêm 1R và hạn giữ thêm 5 nến, tối đa 3 lần. Stop chỉ siết, không nới; cập nhật dùng nến SAU (không nhìn trước). Lý do đóng mới: `breakeven`, `trail`.
+- **AI quản lý:** câu trả lời có thêm `manage:[{coin, stop?, target?, reason}]`. Governor (`adjustPosition`): stop chỉ được siết và phải còn cách giá; target chỉ đẩy xa hơn và chỉ khi đã ≥ +1R với stop ≥ hòa vốn (tối đa 8R). AI vẫn có thể `close`. Quyết định mới: `manage`, `manage-refused`.
+- State (v vẫn 1, trường tùy chọn): lệnh có `side: BUY|SELL`, `market: spot|paper-short`, `sl0`, `managed`, `peakR`; lệnh đóng có `side`, `mfeR`, `sl0`; `rules.side: long|long-short`, `rules.manage`; khối `stats` (win, expR, PF, drawdown, chuỗi, theo hướng/lý do đóng/luật). `state-contract.js` nới tương ứng.
+- UI: nhãn BUY / SELL (short), "stop moved from", trang **Performance** (dùng `stats`, tự tính lại từ `closed` nếu thiếu), nhãn lý do đóng mới, Settings nói đúng long+short.
+- Test: `test/short-manage.test.js` (hình học short, kế toán tiền, target/stop short, hòa vốn, bám đuôi, không nhìn trước, nới target, Governor, closeEarly theo hướng, stats, state, vòng AI short + manage). 6 bộ test pass. `tools/test-ui.js`: 2 lỗi `sample-* overview` có sẵn từ trước V7 (sandbox không mạng), không lỗi JS mới.
+- CHƯA làm: chốt lời từng phần, agent baseline, dữ liệu mới (funding/OI/nến thô/1D), biểu đồ nến có điểm vào/ra, cảnh báo Telegram, backtest. Chưa chạy với API thật.
+
+## 2026-10-31 (tối) — V6.1 đã triển khai + handoff
+- Worker `bot-ai-llm` và trang UI V6 đã deploy ở tài khoản PHỤ; secret `AI_PROXY_URL`/`AI_PROXY_TOKEN` đã đặt. Vòng 41212430677 `success` (providers: Gemini NO KEY → worker-ai gpt-oss-120b …; decisions 1; chưa có ENTERED).
+- Thêm `docs/HANDOFF.md` (trạng thái, việc kế tiếp, lệnh, bẫy); cập nhật `docs/DEPLOYED.md`. Code không đổi; 5 bộ test pass.
+
 ## 2026-10-31 — V5: AI quyết định vào/đóng lệnh (ai.mode = "decide")
 - Mỗi vòng: 1 lần gọi AI với shortlist (≤12 coin có tín hiệu V8 lên, kèm thống kê xanh/validation, brief đầy đủ, BTC/ETH, sổ lệnh, 10 lệnh đóng gần nhất). AI trả JSON: `entries` (id, conviction 1|2, lý do) và `close`. Governor cũ (spread, độ sâu, stop, rủi ro, giới hạn ngày, drawdown) vẫn chặn cuối cùng; AI không chọn qty/stop.
 - Nhà cung cấp theo thứ tự ưu tiên (`config ai.providers`): Gemini → Workers AI gpt-oss-120b → Workers AI gemma. Thiếu khóa thì bỏ qua; lỗi/429 thì nghỉ 30 phút và chuyển nhà kế.

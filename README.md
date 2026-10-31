@@ -1,5 +1,7 @@
 # Bot-AI — bot paper trading (tiền ảo), tách hẳn khỏi app
 
+> **Đang làm dở? Đọc `docs/HANDOFF.md` trước.** (V7: long + short mô phỏng, tự dời stop/target, trang Performance.)
+
 **Xóa cả thư mục này thì app không đổi gì.** App không biết bot tồn tại.
 
 ## Nguyên tắc ghép nối

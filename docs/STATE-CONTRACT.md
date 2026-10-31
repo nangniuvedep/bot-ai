@@ -23,3 +23,11 @@ Fresh: the page shows STALE DATA when `updatedAt` is older than `config.staleAft
 - `rules`: the real limits from config (market, side, leverage, stopAtr, targetAtr, maxHoldCandles, riskPct, ...). The validator rejects `leverage != 1` or `side != "long"`.
 - `ai`: `{mode, providers[], last:{t, ok, provider, model, ms, view, noTrade, why, candidates, picked, calls}}`.
 - `decisions[]`: last 40 `{t, coin?, tf?, rule?, action: open|skip|wait|close|ai-view, reason, why?, conf?, conv?, provider?, model?}`. `why` is a short AI sentence (<=200 chars); the page escapes it.
+
+
+## V7 (trường tùy chọn, `v` vẫn = 1)
+- `open[].side`: `BUY` | `SELL` (SELL = short mô phỏng, `market: "paper-short"`); `leverage` luôn 1. Với SELL: `sl > entry > tp`, `slPct > 0`, `tpPct < 0`, `pnl` dương khi giá giảm.
+- `open[].sl0` (stop ban đầu), `managed` (stop đã được dời), `peakR` (lãi tốt nhất đã đạt, đơn vị R). `closed[].side`, `mfeR`, `sl0`. Lý do đóng thêm: `breakeven`, `trail`.
+- `rules.side`: `long` | `long-short`; `rules.manage`: `{breakevenAtR, trailAtR, trailDistR, maxExtends}` hoặc null.
+- `stats`: `{n, win, expR, avgWinR, avgLossR, profitFactor, maxDrawdown, avgHoldMin, bestStreak, worstStreak, avgMfeR, bySide, byWhy, byRule}`; `bySide/byWhy/byRule[k] = {n, win, expR, pnl}`.
+- `decisions[].action` thêm `manage`, `manage-refused`; `decisions[].side`.

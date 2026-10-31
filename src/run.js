@@ -58,7 +58,7 @@ async function round({ ledger, cfg = CFG, now = Date.now(), fetchFn = fetch, rea
       else refuse(res);
     }
   }
-  L.recent = (L.recent || []).concat(decisions.filter((d) => d.action && d.action !== "rule-paused").map((d) => ({ t: d.t, coin: d.coin, tf: d.tf, rule: d.rule, action: d.action, reason: d.reason,
+  L.recent = (L.recent || []).concat(decisions.filter((d) => d.action && d.action !== "rule-paused").map((d) => ({ t: d.t, coin: d.coin, tf: d.tf, rule: d.rule, action: d.action, reason: d.reason, side: d.side,
     why: String((d.ai && d.ai.why) || d.detail || (d.action === "close" && d.reason) || (d.action === "ai-view" && d.reason) || "").slice(0, 200), conf: d.ai && d.ai.confidence != null ? d.ai.confidence : undefined, conv: d.ai && d.ai.conviction, provider: d.provider, model: d.model }))).slice(-80);
   B.logAdd(L, cfg, now, "run", counts);
   B.finishRound(L, cfg, now);
