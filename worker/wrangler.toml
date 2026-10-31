@@ -1,0 +1,10 @@
+# Deploy:  cd worker && npx wrangler kv namespace create STATE   (paste the id below)
+#          npx wrangler secret put WRITE_TOKEN                    (any long random string; the bot uses the same one)
+#          npx wrangler deploy
+name = "bot-ai-state"
+main = "state-worker.mjs"
+compatibility_date = "2025-01-01"
+
+[[kv_namespaces]]
+binding = "STATE"
+id = "da0251bef602435f8ba4c1cab6c2f754"

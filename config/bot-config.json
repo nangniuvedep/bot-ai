@@ -1,0 +1,48 @@
+{
+  "_note": "Mọi con số của bot nằm ở đây (mục 7 của BOT-AI-DESIGN, mặc định đề xuất). Đổi số ở đây, không sửa code.",
+  "tfs": [
+    "1H",
+    "4H"
+  ],
+  "cfg": "1-2",
+  "green": {
+    "minN": 50,
+    "edge": 0.02
+  },
+  "startEquity": 10000,
+  "riskPct": 0.01,
+  "maxPositions": 5,
+  "openRiskLimit": 0.05,
+  "dayLossPct": 0.03,
+  "drawdownLimit": 0.1,
+  "maxNotionalPct": 0.25,
+  "cooldownCandles": 3,
+  "maxHoldCandles": 10,
+  "feePct": 0.001,
+  "stopSlipPct": 0.0005,
+  "timeoutSlipPct": 0.0005,
+  "maxSpreadPct": 0.0015,
+  "maxChaseAtr": 0.5,
+  "maxEntryDelayMin": 30,
+  "minStopPct": 0.003,
+  "maxStopPct": 0.12,
+  "depthLevels": 20,
+  "maxLog": 60,
+  "maxClosedInState": 500,
+  "maxEquityPoints": 1500,
+  "killSwitch": false,
+  "maxNewPerRound": 2,
+  "maxTradesPerDay": 6,
+  "codeGuard": {
+    "window": 20,
+    "minTrades": 12,
+    "minExpectancyR": -0.3,
+    "pauseHours": 72
+  },
+  "ai": {
+    "mode": "off",
+    "maxCallsPerDay": 60,
+    "minShrink": 0.25,
+    "timeoutMs": 20000
+  }
+}

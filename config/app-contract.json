@@ -1,0 +1,18 @@
+{
+  "_note": "Chỗ DUY NHẤT khai báo cách đọc app. Đổi app thì sửa ở đây (và src/app-reader.js nếu hình dạng file đổi).",
+  "snapshot": "bubblelayer-V1479",
+  "base": "https://ta.bubblelayer.com/",
+  "timeoutMs": 15000,
+  "atIsCandleClose": true,
+  "_atNote": "Quan sát từ file thật (31/10/2026): at của khung = floor(now/tfMs)*tfMs = lúc nến VỪA ĐÓNG = lúc mở nến kế. Nên nến vào lệnh E = at (không phải at + tfMs). Đặt false nếu app đổi.",
+  "files": {
+    "signals":    { "name": "alerts-signals.json",    "v": [2], "maxAgeMin": 90 },
+    "brief":      { "name": "alerts-brief.json",      "v": [2], "maxAgeMin": 90 },
+    "live":       { "name": "alerts-live.json",       "v": [2], "maxAgeMin": 90 },
+    "rules":      { "name": "alerts-rules.json",      "v": [1], "maxAgeMin": null },
+    "validation": { "name": "alerts-validation.json", "v": [2], "maxAgeMin": 4320 },
+    "etf":        { "name": "alerts-etf.json",        "v": null, "maxAgeMin": 4320 }
+  },
+  "timeframes": ["15m", "1H", "4H", "1D"],
+  "tfMs": { "15m": 900000, "1H": 3600000, "4H": 14400000, "1D": 86400000 }
+}

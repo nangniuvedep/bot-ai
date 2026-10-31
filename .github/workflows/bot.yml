@@ -1,0 +1,31 @@
+# Copy to the BOT repo as .github/workflows/bot.yml  (a separate repo from the app and the scanner).
+# Ledger + state live on a separate branch "bot-data" so code commits and data commits never mix.
+# One-time: create the branch  (git checkout --orphan bot-data && git rm -rf . && git commit --allow-empty -m init && git push origin bot-data)
+# Secrets: BOT_STATE_URL (the state Worker URL), BOT_STATE_TOKEN (the Worker's WRITE_TOKEN).
+name: bot-ai
+on:
+  schedule: [{ cron: "8,23,38,53 * * * *" }]   # after the scanner's 01/16/31/46 runs; GitHub may delay a few minutes (entry window: 30 min)
+  workflow_dispatch: {}
+concurrency: { group: bot-ai, cancel-in-progress: false }   # one round at a time
+permissions: { contents: write }
+jobs:
+  round:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with: { ref: bot-data, path: data }
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - run: node test/app-reader.test.js && node test/state.test.js && node test/bot.test.js && node test/improve.test.js
+      - run: node src/run.js --ledger data/ledger.json --state data/bot-state.json
+      - name: Publish state (a failure here must not lose the ledger)
+        continue-on-error: true
+        env: { BOT_STATE_URL: "${{ secrets.BOT_STATE_URL }}", BOT_STATE_TOKEN: "${{ secrets.BOT_STATE_TOKEN }}" }
+        run: node tools/publish-state.js data/bot-state.json
+      - name: Save ledger
+        working-directory: data
+        run: |
+          git config user.name "bot-ai"; git config user.email "bot-ai@users.noreply.github.com"
+          git add -A; git diff --cached --quiet || (git commit -m "round $(date -u +%FT%TZ)" && git push origin bot-data)

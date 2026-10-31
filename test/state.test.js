@@ -1,0 +1,42 @@
+/* node test/state.test.js — contract validator + Worker (with an in-memory KV). No network. */
+"use strict";
+const assert = require("assert"), fs = require("fs"), path = require("path"), vm = require("vm");
+const { validate } = require("../src/state-contract.js");
+const w = {}; w.window = w; vm.runInNewContext(fs.readFileSync(path.join(__dirname, "../ui/sample-state.js"), "utf8"), w);
+const sample = () => JSON.parse(JSON.stringify(w.BOTAI.sample));
+(async () => {
+  const s = sample(); s.updatedAt = Date.now();
+  assert.deepStrictEqual(validate(s), { ok: true, errors: [] }, "sample state must be valid: " + JSON.stringify(validate(s).errors));
+  const bad = (mut, re) => { const x = sample(); x.updatedAt = Date.now(); mut(x); const r = validate(x); assert(!r.ok && r.errors.some((m) => re.test(m)), "expected " + re + " got " + JSON.stringify(r.errors)); };
+  bad((x) => { x.v = 2; }, /v must be 1/);
+  bad((x) => { x.mode = "live"; }, /paper/);
+  bad((x) => { x.equity = [[1, 1]]; }, /equity needs/);
+  bad((x) => { x.equity[1][0] = 1; }, /older than the previous/);
+  bad((x) => { delete x.open[0].qty; }, /qty/);
+  bad((x) => { x.open[0].qty = 0; }, /qty must be > 0/);
+  bad((x) => { x.risk.positions = 9; }, /must equal open.length/);
+  bad((x) => { x.log.push({ t: 1, k: "weird", v: {} }); }, /log\[\d+\]\.k/);
+  bad((x) => { x.signals[0].st = "buy"; }, /\.st/);
+  assert(!validate(null).ok && !validate([]).ok);
+
+  const worker = (await import("../worker/state-worker.mjs")).default, kv = new Map();
+  const env = { STATE: { get: async (k) => kv.get(k) ?? null, put: async (k, v) => { kv.set(k, v); } }, WRITE_TOKEN: "secret-token" };
+  const call = (method, p, o = {}) => worker.fetch(new Request("https://x.workers.dev" + p, { method, ...o }), env);
+  assert.strictEqual((await call("GET", "/state.json")).status, 404, "empty -> 404");
+  const body = JSON.stringify(s), auth = { authorization: "Bearer secret-token" };
+  assert.strictEqual((await call("PUT", "/state", { body })).status, 401, "no token");
+  assert.strictEqual((await call("PUT", "/state", { body, headers: { authorization: "Bearer wrong-token!" } })).status, 401, "wrong token");
+  assert.strictEqual((await call("PUT", "/state", { body: "{", headers: auth })).status, 400, "not JSON");
+  assert.strictEqual((await call("PUT", "/state", { body: JSON.stringify({ v: 2, updatedAt: 1 }), headers: auth })).status, 400, "wrong v");
+  assert.strictEqual((await call("PUT", "/state", { body, headers: auth })).status, 200, "write ok");
+  const g = await call("GET", "/state.json");
+  assert.strictEqual(g.status, 200); assert.strictEqual(g.headers.get("access-control-allow-origin"), "*"); assert.strictEqual(g.headers.get("cache-control"), "no-store");
+  assert.strictEqual((await g.json()).updatedAt, s.updatedAt);
+  const older = JSON.stringify({ ...s, updatedAt: s.updatedAt - 1000 });
+  assert.strictEqual((await call("PUT", "/state", { body: older, headers: auth })).status, 409, "older state refused");
+  assert.strictEqual((await call("PUT", "/state", { body: "x".repeat(600 * 1024), headers: auth })).status, 413, "too large");
+  assert.strictEqual((await call("POST", "/state.json")).status, 404, "no write via /state.json");
+  assert.strictEqual((await call("OPTIONS", "/state.json")).status, 204, "CORS preflight");
+  assert.strictEqual((await worker.fetch(new Request("https://x/state", { method: "PUT", body, headers: auth }), { STATE: env.STATE })).status, 401, "no WRITE_TOKEN configured -> closed");
+  console.log("state: all tests passed");
+})().catch((e) => { console.error(e); process.exit(1); });
