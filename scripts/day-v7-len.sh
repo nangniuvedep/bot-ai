@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Day V7 len GitHub (thay V6 tren nhanh main) + deploy trang giao dien + chay bot 1 vong + xem log.
-# Chay: bash ~/Downloads/Bot-AI-V4/scripts/day-v7-len.sh     (thu muc nay = ban V7 vua giai nen)
+# Chay: bash ~/Downloads/Bot-AI-V4/scripts/day-v7-len.sh ["loi nhan commit"]     (thu muc nay = ban V7 vua giai nen)
 # Chi dung tai khoan PHU: GitHub nangniuvedep, Cloudflare nangniuvedep@gmail.com. Khong dung vao Looknow.
 set -euo pipefail
 SRC="$(cd "$(dirname "$0")/.." && pwd)"; REPO="nangniuvedep/bot-ai"; cd "$SRC"
@@ -25,7 +25,7 @@ if git diff --cached --quiet; then echo "Khong co thay doi so voi main (V7 da le
   git diff --cached --stat | tail -15
   git config user.name >/dev/null 2>&1 || git config user.name "nangniuvedep"
   git config user.email >/dev/null 2>&1 || git config user.email "nangniuvedep@users.noreply.github.com"
-  git commit -q -m "V7: short mo phong, tu doi SL/TP (hoa von, bam duoi, noi target), AI manage, trang Performance"
+  git commit -q -m "${1:-V7: short mo phong, tu doi SL/TP, AI manage, trang Performance}"
   say "4/6 Day len main"
   git push -q origin main && echo "Da day: $(git rev-parse --short HEAD)"
 fi

@@ -43,8 +43,8 @@
     "mode": "decide",
     "maxCallsPerDay": 96,
     "maxCandidates": 12,
-    "timeoutMs": 60000,
-    "maxOutputTokens": 1500,
+    "timeoutMs": 90000,
+    "maxOutputTokens": 3500,
     "pauseMin": 30,
     "minShrink": 0.25,
     "providers": [

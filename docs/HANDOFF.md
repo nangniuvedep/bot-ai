@@ -2,7 +2,12 @@
 
 **Chat mới / AI mới: đọc file này, rồi `docs/DEPLOYED.md` (luật 2 tài khoản Cloudflare), rồi mới làm.**
 
-## 0. V7 (mới nhất): short mô phỏng + quản lý SL/TP — CHƯA deploy
+## 0a. TÌNH TRẠNG MỚI NHẤT (31/10 đêm)
+- V7 ĐÃ lên GitHub `main` (162f90a) và trang Pages; vòng 41214156444 `success`.
+- **LỖI ĐANG MỞ:** log `AI unavailable: gemini no-key | worker-ai empty answer | worker-ai empty answer | workers-ai no-key`. AI chưa trả lời được. V7.1 (trong ZIP này) sửa cách đọc phản hồi + tăng token + log chẩn đoán; **chưa đẩy lên**. Đẩy: `bash ~/Downloads/Bot-AI-V4/scripts/day-v7-len.sh "V7.1: fix AI empty answer"`, rồi đọc dòng `AI unavailable` hoặc `ENTERED` trong log.
+- Nếu vẫn `empty answer`: dòng log giờ ghi `keys/finish/reasoning/out_tokens`. `finish=length` → tăng `maxOutputTokens` hoặc đổi model; `keys=` lạ → thêm dạng vào `textOf()`. Phương án dự phòng: đặt khóa `GEMINI_API_KEY` (nhà số 1) bằng `gh secret set GEMINI_API_KEY --repo nangniuvedep/bot-ai`.
+
+## 0. V7: short mô phỏng + quản lý SL/TP (đã deploy)
 - Code V7 có trong ZIP này, 6 bộ test pass, nhưng **chưa commit/push, chưa chạy với dữ liệu thật**. Chi tiết: `docs/CHANGELOG.md` mục V7.
 - **Đưa lên bằng một lệnh:** `bash ~/Downloads/Bot-AI-V4/scripts/day-v7-len.sh` (test → kiểm tài khoản → clone repo mới → chép V7 đè → commit/push main → deploy Pages → chạy bot → xem log). Dưới đây là cách làm tay tương đương.
 - Cách đưa lên: chép code vào repo git thật → `git add -A && git commit -m "V7 short + trade management" && git push`; rồi deploy lại trang: `cd ~/Downloads/Bot-AI-V4 && npx wrangler pages deploy ui --project-name bot-ai-ui --branch main` (whoami phải là nangniuvedep@gmail.com). Worker AI/state KHÔNG cần deploy lại. Chạy tay: `gh workflow run bot.yml --repo nangniuvedep/bot-ai`.

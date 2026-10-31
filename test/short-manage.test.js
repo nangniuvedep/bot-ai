@@ -91,5 +91,21 @@ const kl = (rows) => async () => ({ ok: true, data: rows.map(([t, o, h, l, c]) =
   assert(rr.decisions.some((d) => d.action === "manage-refused" && d.reason === "stop-not-tighter"));
   rr = await go({ ledger: rr.ledger, now: NOW + 45 * M, readApp: async () => ({ signals: { "1H": { at: S, scanned: 0, coins: [] } }, brief: mkApp([]).brief, validation: val }), aiFn: ai({ entries: [], close: [{ coin: "AAA", reason: "resistance reclaimed" }] }) });
   assert.strictEqual(rr.ledger.open.length, 0); assert(rr.ledger.closed[rr.ledger.closed.length - 1].side === -1 && rr.state.closed[rr.state.closed.length - 1].side === "SELL");
+  // 10. provider answer extraction: every shape Workers AI / OpenAI-style models use; reasoning-only answers; useful diagnostics when empty
+  const AP = require("../src/ai-provider.js"), J = '{"entries":[],"close":[]}';
+  assert.strictEqual(AP.textOf({ response: J }), J);
+  assert.strictEqual(AP.textOf({ choices: [{ message: { content: J } }] }), J);
+  assert.strictEqual(AP.textOf({ choices: [{ message: { content: [{ type: "text", text: J }] } }] }), J);
+  assert.strictEqual(AP.textOf({ output_text: J }), J);
+  assert.strictEqual(AP.textOf({ output: [{ type: "reasoning", content: [{ text: "thinking" }] }, { type: "message", content: [{ type: "output_text", text: J }] }] }), J);
+  assert.strictEqual(AP.textOf({ result: { response: J } }), J);
+  assert.strictEqual(AP.textOf({ choices: [{ message: { content: null, reasoning_content: "hmm " + J } }] }), "hmm " + J, "answer cut off inside the reasoning is still usable");
+  assert.strictEqual(AP.textOf({ choices: [{ message: { content: null, reasoning_content: "only thinking" } }] }), "");
+  assert.strictEqual(AP.textOf({ choices: [{ finish_reason: "length", message: { content: "" } }] }), "");
+  const w = AP.why({ choices: [{ finish_reason: "length", message: { content: "", reasoning_content: "abc" } }], usage: { completion_tokens: 1500 } }); assert(/finish=length/.test(w) && /reasoning=3ch/.test(w) && /out_tokens=1500/.test(w), w);
+  const cfgp = { ai: { providers: [{ type: "worker-ai", model: "@cf/x/y" }], timeoutMs: 1000, maxOutputTokens: 100, pauseMin: 1 } };
+  const okp = await AP.call(cfgp, { system: "s", user: "u" }, { env: { AI_PROXY_URL: "https://x", AI_PROXY_TOKEN: "t" }, fetchFn: async () => ({ ok: true, json: async () => ({ result: { choices: [{ message: { content: J } }] } }) }) }); assert(okp.ok && okp.text === J);
+  const bad = await AP.call(cfgp, { system: "s", user: "u" }, { env: { AI_PROXY_URL: "https://x", AI_PROXY_TOKEN: "t" }, fetchFn: async () => ({ ok: true, json: async () => ({ result: { id: "1", choices: [{ finish_reason: "length", message: { content: "" } }] } }) }) });
+  assert(!bad.ok && /empty answer/.test(bad.why) && /finish=length/.test(bad.why), bad.why);
   console.log("short-manage: all tests passed");
 })().catch((e) => { console.error(e); process.exit(1); });

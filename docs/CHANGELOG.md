@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## 2026-10-31 (đêm) — V7.1: sửa AI trả "empty answer"
+- Phát hiện sau khi V7 lên (commit 162f90a, vòng 41214156444 `success`): cả `worker-ai/gpt-oss-120b` và `worker-ai/gemma-4` trả `empty answer` → AI chưa quyết định được gì. Nguyên nhân CHƯA xác nhận (chưa thấy phản hồi thật): nghi model suy luận trả định dạng khác hoặc hết 1500 token trong phần suy luận.
+- `ai-provider.js`: `textOf()` đọc mọi dạng (`response`, `choices[].message.content` chuỗi/mảng, `output_text`, `output[]` kiểu Responses, `reasoning_content` chứa JSON khi bị cắt); `why()` ghi hình dạng phản hồi vào log (`keys`, `finish`, `msg`, `reasoning`, `out_tokens`). Config: `maxOutputTokens` 1500 → 3500, `timeoutMs` 60000 → 90000.
+- Test thêm trong `short-manage.test.js` (mục 10). Chưa xác nhận với API thật: đọc dòng `AI unavailable: ... empty answer (keys=... finish=...)` ở vòng chạy kế tiếp.
+
 ## 2026-10-31 (đêm) — V7: short mô phỏng + quản lý SL/TP + trang Performance
 - **Short (paper, 1x, KHÔNG phải spot thật):** tín hiệu V8 hướng xuống nay thành ứng viên `side: short` (config `allowShort`). Vào ở bid (khớp sổ bids), stop trên giá vào, target dưới; cỡ lệnh x`shortSizeMult` (0.5); phí funding giả định `shortFundingPctPerDay` (0.03%/ngày) tính lúc đóng. Đo "xanh" của short dùng base `dn` của app. **[KIỂM]** chưa rõ bảng Validation của app có trộn hướng không → số liệu short kém chắc hơn; AI được dặn khắt khe hơn.
 - **Quản lý lệnh (`config.manage`):** +1R → dời stop về hòa vốn (+0.2% bù phí); +1.5R → stop bám đuôi (đỉnh − 1R); giá tiến gần target (<0.5R) → nới target thêm 1R và hạn giữ thêm 5 nến, tối đa 3 lần. Stop chỉ siết, không nới; cập nhật dùng nến SAU (không nhìn trước). Lý do đóng mới: `breakeven`, `trail`.

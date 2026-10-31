@@ -6,6 +6,29 @@
 
 const clip = (s, n = 120) => String(s || "").replace(/\s+/g, " ").slice(0, n);
 
+
+/* Workers AI models answer in different shapes (plain {response}, OpenAI chat {choices}, Responses API {output}, reasoning models with content in
+   reasoning_content when the token budget ran out). Returns the answer text, or "" — and `why(res)` describes the shape for the log. */
+const partsText = (c) => (typeof c === "string" ? c : Array.isArray(c) ? c.map((x) => (typeof x === "string" ? x : (x && (x.text || x.content)) || "")).join("") : "");
+function textOf(res) {
+  if (!res || typeof res !== "object") return typeof res === "string" ? res : "";
+  if (typeof res.response === "string" && res.response.trim()) return res.response;
+  if (res.result && res.result !== res) { const t = textOf(res.result); if (t) return t; }
+  if (typeof res.output_text === "string" && res.output_text.trim()) return res.output_text;
+  const ch = res.choices && res.choices[0], m = ch && (ch.message || ch.delta);
+  if (m) { const t = partsText(m.content); if (t.trim()) return t; }
+  if (ch && typeof ch.text === "string" && ch.text.trim()) return ch.text;
+  if (Array.isArray(res.output)) { const t = res.output.filter((o) => o && o.type !== "reasoning").map((o) => partsText(o.content) || (typeof o.text === "string" ? o.text : "")).join(""); if (t.trim()) return t; }
+  const rc = m && (m.reasoning_content || m.reasoning);   // answer cut off inside the reasoning: use it only if it holds the JSON we asked for
+  if (typeof rc === "string" && /"entries"\s*:/.test(rc)) return rc;
+  return "";
+}
+function why(res) {
+  if (!res || typeof res !== "object") return "result=" + typeof res;
+  const ch = res.choices && res.choices[0], m = ch && ch.message;
+  return "keys=" + Object.keys(res).slice(0, 6).join(",") + (ch ? " finish=" + ch.finish_reason + " msg=" + (m ? Object.keys(m).join(",") : "none") + (m && (m.reasoning_content || m.reasoning) ? " reasoning=" + String(m.reasoning_content || m.reasoning).length + "ch" : "") : "") + (res.usage ? " out_tokens=" + (res.usage.completion_tokens || res.usage.output_tokens) : "");
+}
+
 /* one provider -> text. Throws Error on any failure (message kept short, never contains a key). */
 async function once(p, { system, user }, { env, fetchFn, timeoutMs, maxTokens }) {
   const sig = AbortSignal.timeout(timeoutMs), json = { "content-type": "application/json" };
@@ -19,14 +42,12 @@ async function once(p, { system, user }, { env, fetchFn, timeoutMs, maxTokens })
   if (p.type === "workers-ai") {
     r = await fetchFn(`https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(env[p.accountEnv || "CF_ACCOUNT_ID"])}/ai/run/${p.model}`, { method: "POST", signal: sig, headers: { ...json, authorization: "Bearer " + env[p.keyEnv || "CF_API_TOKEN"] },
       body: JSON.stringify({ messages: [{ role: "system", content: system }, { role: "user", content: user }], max_tokens: maxTokens, temperature: 0.2 }) });
-    body = await readBody(r); const res = body.result || {};
-    return typeof res.response === "string" ? res.response : (res.choices && res.choices[0] && res.choices[0].message && res.choices[0].message.content) || "";
+    body = await readBody(r); const t1 = textOf(body.result); if (!t1) throw new Error("empty answer (" + why(body.result) + ")"); return t1;
   }
   if (p.type === "worker-ai") {   // our own tiny Worker (worker/ai-worker.mjs) that holds the Workers AI binding: no Cloudflare API token needed
     r = await fetchFn(env[p.urlEnv || "AI_PROXY_URL"], { method: "POST", signal: sig, headers: { ...json, authorization: "Bearer " + env[p.keyEnv || "AI_PROXY_TOKEN"] },
       body: JSON.stringify({ model: p.model, messages: [{ role: "system", content: system }, { role: "user", content: user }], max_tokens: maxTokens, temperature: 0.2 }) });
-    body = await readBody(r); const res = body.result || {};
-    return typeof res.response === "string" ? res.response : (res.choices && res.choices[0] && res.choices[0].message && res.choices[0].message.content) || "";
+    body = await readBody(r); const t2 = textOf(body.result); if (!t2) throw new Error("empty answer (" + why(body.result) + ")"); return t2;
   }
   if (p.type === "openai") {   // NVIDIA NIM, Groq, OpenRouter, OpenAI ...
     r = await fetchFn(p.baseUrl.replace(/\/$/, "") + "/chat/completions", { method: "POST", signal: sig, headers: { ...json, authorization: "Bearer " + env[p.keyEnv] },
@@ -53,10 +74,10 @@ async function call(cfg, prompt, { env = process.env, fetchFn = fetch, L = null,
       if (!text || !String(text).trim()) throw new Error("empty answer");
       return { ok: true, text: String(text), provider: p.type, model: p.model, ms: Date.now() - t0 };
     } catch (e) {
-      const msg = clip((e && e.message) || e, 90); tried.push(p.type + " " + msg);
+      const msg = clip((e && e.message) || e, 170); tried.push(p.type + " " + msg);
       off[id] = now + (a.pauseMin || 30) * 6e4;   // rotate: do not hammer a provider that just failed / hit its free limit
     }
   }
   return { ok: false, why: tried.length ? tried.join(" | ") : "no providers configured" };
 }
-module.exports = { call, hasKey };
+module.exports = { call, hasKey, textOf, why };
