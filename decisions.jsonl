@@ -169,3 +169,4 @@
 {"t":1793498865522,"coin":"QNT","tf":"1H","rule":"TR-09","key":"QNT|1H|1793498400000","action":"skip","reason":"ai-skip","detail":"AI did not select this signal","provider":"worker-ai","model":"@cf/openai/gpt-oss-120b","ms":48982}
 {"t":1793498865522,"coin":"XRP","tf":"1H","rule":"SR-03","key":"XRP|1H|1793498400000","action":"skip","reason":"ai-skip","detail":"AI did not select this signal","provider":"worker-ai","model":"@cf/openai/gpt-oss-120b","ms":48982}
 {"t":1793498865522,"coin":"AVAX","tf":"1H","rule":"SR-03","key":"AVAX|1H|1793498400000","action":"skip","reason":"ai-skip","detail":"AI did not select this signal","provider":"worker-ai","model":"@cf/openai/gpt-oss-120b","ms":48982}
+{"t":1793501771558,"action":"ai-view","reason":"BTC 1H flat, 4H down; ETH 1H flat, 4H down. No candidate signals this round.","noTrade":"No candidate signals available.","picked":[],"closing":[],"provider":"worker-ai","model":"@cf/openai/gpt-oss-120b","ms":10330}
